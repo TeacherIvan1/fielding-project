@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+:root {
+  --fielding-green: #266b31;
+  --fielding-dark-green: #1b4e23;
+  --fielding-gold: #d6a427;
+  --fielding-light-green: #9ac29d;
+  --fielding-bg: #FAFAF0;
+}
+
+body {
+  font-family: var(--font-open-sans), system-ui, -apple-system, sans-serif;
+  background-color: var(--fielding-bg);
+  color: #1e293b;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-montserrat), system-ui, -apple-system, sans-serif;
+}
