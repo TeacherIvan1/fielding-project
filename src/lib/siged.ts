@@ -36,15 +36,15 @@ export function getGradeColorClass(val: number | string | null | undefined): str
   }
 
   if (n < 51) {
-    return "bg-[#fee2e2] text-[#b91c1c] font-bold";
+    return "bg-[#fee2e2] text-[#b91c1c] font-bold border border-red-300";
   }
   if (n >= 51 && n <= 65) {
-    return "bg-[#fef3c7] text-[#b45309] font-bold";
+    return "bg-[#fef3c7] text-[#b45309] font-bold border border-amber-300";
   }
   if (n >= 90) {
-    return "bg-[#dcfce7] text-[#15803d] font-bold";
+    return "bg-[#dcfce7] text-[#15803d] font-bold border border-emerald-300";
   }
-  return "bg-[#f1f5f9] text-[#1e293b] font-semibold";
+  return "bg-[#f1f5f9] text-[#1e293b] font-semibold border border-slate-200";
 }
 
 /**
@@ -79,7 +79,7 @@ export function getClasificacionCurricular(
     /^[A-C][1-2](-[A-B])?$/.test(cNorm);
 
   if (isEnglishOrMCER) {
-    materiaFinal = "LENGUA EXTRANJERA";
+    materiaFinal = "LENGUA EXTRANJERA (INGLÉS)";
     campo = "COMUNIDAD Y SOCIEDAD";
     area = "COMUNICACIÓN Y LENGUAJES";
     return { campo, area, materia: materiaFinal };

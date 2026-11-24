@@ -1,0 +1,24 @@
+{
+  "name": "Fielding App - Colegio Fielding Bolivia",
+  "short_name": "Fielding App",
+  "description": "Plataforma Académica y Seguimiento Escolar en Tiempo Real - Unidad Educativa Fielding Bolivia",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAFAF0",
+  "theme_color": "#266b31",
+  "icons": [
+    {
+      "src": "https://i.imgur.com/wjibHTr.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://i.imgur.com/wjibHTr.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

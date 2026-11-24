@@ -1,5 +1,5 @@
 import "./globals.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Montserrat, Open_Sans } from "next/font/google";
 
 const montserrat = Montserrat({
@@ -17,8 +17,20 @@ const openSans = Open_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Colegio Fielding Bolivia • Plataforma Académica",
-  description: "Sistema de gestión escolar y centralizador de calificaciones en tiempo real",
+  title: "Fielding App • Colegio Fielding Bolivia",
+  description: "Plataforma Académica y de Seguimiento Escolar en Tiempo Real",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "https://i.imgur.com/wjibHTr.png",
+    apple: "https://i.imgur.com/wjibHTr.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#266b31",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -28,6 +40,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={`${montserrat.variable} ${openSans.variable}`}>
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Fielding App" />
+      </head>
       <body className={`antialiased bg-[#FAFAF0] text-slate-800 ${openSans.className}`}>
         {children}
       </body>

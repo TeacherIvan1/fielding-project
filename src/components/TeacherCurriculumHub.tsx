@@ -1,888 +1,776 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState } from "react";
 import {
   FileText,
   BookOpen,
   Printer,
-  Filter,
-  CheckCircle2,
-  Calendar,
-  Layers,
   Sparkles,
-  Search,
-  ChevronRight,
-  Info,
+  CheckCircle2,
+  Loader2,
 } from "lucide-react";
-import { PDCRecord, ClaseRecord } from "@/app/api/curriculum/route";
+import { useDemoStore } from "@/lib/demoStore";
 
 export default function TeacherCurriculumHub() {
+  const { pdcTemplate, planTemplate, updatePdcTemplate, updatePlanTemplate } = useDemoStore();
   const [activeMode, setActiveMode] = useState<"pdc" | "planes">("pdc");
-  const [pdcs, setPdcs] = useState<PDCRecord[]>([]);
-  const [planes, setPlanes] = useState<ClaseRecord[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  // -------------------------------------------------------------
-  // FILTROS MODO PDC
-  // -------------------------------------------------------------
-  const [pdcMateria, setPdcMateria] = useState<string>("Historia de Bolivia");
-  const [pdcAnio, setPdcAnio] = useState<string>("1ro de Secundaria");
-  const [pdcMes, setPdcMes] = useState<string>("Febrero");
+  // Filtros sincronizados con la plantilla activa en localStorage
+  const activeDoc = activeMode === "pdc" ? pdcTemplate : planTemplate;
+  const materia = activeDoc.materia;
+  const grado = activeDoc.grado;
+  const mes = activeDoc.mes;
+  const tema = activeDoc.tema;
 
-  // -------------------------------------------------------------
-  // FILTROS MODO PLANES DE CLASE
-  // -------------------------------------------------------------
-  const [claseGrado, setClaseGrado] = useState<string>("1º de Secundaria");
-  const [claseAsignatura, setClaseAsignatura] = useState<string>("Historia Universal");
-  const [claseMes, setClaseMes] = useState<string>("Septiembre");
-  const [claseViewMode, setClaseViewMode] = useState<string>("ALL");
+  const setFilter = (field: "materia" | "grado" | "mes" | "tema", value: string) => {
+    updatePdcTemplate({ [field]: value });
+    updatePlanTemplate({ [field]: value });
+  };
 
-  useEffect(() => {
-    fetch("/api/curriculum")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.pdcs && data.pdcs.length > 0) {
-          setPdcs(data.pdcs);
-          // Ajustar filtros iniciales basados en los datos
-          setPdcMateria(data.pdcs[0].materia || "Historia de Bolivia");
-          setPdcAnio(data.pdcs[0].anio_escolaridad || "1ro de Secundaria");
-          setPdcMes(data.pdcs[0].mes || "Febrero");
-        }
-        if (data.planes && data.planes.length > 0) {
-          setPlanes(data.planes);
-          setClaseGrado(data.planes[0].GRADO || "1º de Secundaria");
-          setClaseAsignatura(data.planes[0].ASIGNATURA || "Historia Universal");
-          setClaseMes(data.planes[0].MES || "Septiembre");
-        }
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Error al cargar currículo:", err);
-        setLoading(false);
-      });
-  }, []);
+  // Estado de Generación IA (Demo progresivo de 1.2s)
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationStep, setGenerationStep] = useState("");
+  const [aiGenerated, setAiGenerated] = useState(false);
 
-  // -------------------------------------------------------------
-  // SELECTORES DINÁMICOS - PDCs
-  // -------------------------------------------------------------
-  const pdcMateriasDisponibles = useMemo(() => {
-    const list = Array.from(new Set(pdcs.map((p) => p.materia).filter(Boolean)));
-    return list.length > 0 ? list : ["Historia de Bolivia", "Historia Universal", "Inglés"];
-  }, [pdcs]);
+  const handleGenerateAI = () => {
+    setIsGenerating(true);
+    setAiGenerated(false);
+    setGenerationStep("1/3 Analizando lineamientos curriculares del SEP Bolivia...");
 
-  const pdcAniosDisponibles = useMemo(() => {
-    const filtered = pdcs.filter((p) => !pdcMateria || p.materia === pdcMateria);
-    const list = Array.from(new Set(filtered.map((p) => p.anio_escolaridad).filter(Boolean)));
-    return list.length > 0
-      ? list
-      : ["1ro de Secundaria", "2do de Secundaria", "3ro de Secundaria", "4to de Secundaria", "Nivel A2-B", "Nivel B1-A"];
-  }, [pdcs, pdcMateria]);
+    setTimeout(() => {
+      setGenerationStep("2/3 Articulando objetivo holístico con dimensiones SER, SABER, HACER, DECIDIR...");
+    }, 400);
 
-  const pdcMesesDisponibles = useMemo(() => {
-    const filtered = pdcs.filter(
-      (p) => (!pdcMateria || p.materia === pdcMateria) && (!pdcAnio || p.anio_escolaridad === pdcAnio)
-    );
-    const list = Array.from(new Set(filtered.map((p) => p.mes).filter(Boolean)));
-    return list.length > 0
-      ? list
-      : ["Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre"];
-  }, [pdcs, pdcMateria, pdcAnio]);
+    setTimeout(() => {
+      setGenerationStep("3/3 Estructurando orientaciones metodológicas, recursos y criterios...");
+    }, 800);
 
-  // PDC Seleccionado activo
-  const selectedPDC = useMemo(() => {
-    return (
-      pdcs.find(
-        (p) =>
-          p.materia === pdcMateria &&
-          p.anio_escolaridad === pdcAnio &&
-          p.mes.toLowerCase() === pdcMes.toLowerCase()
-      ) ||
-      pdcs.find((p) => p.materia === pdcMateria && p.anio_escolaridad === pdcAnio) ||
-      pdcs[0] ||
-      null
-    );
-  }, [pdcs, pdcMateria, pdcAnio, pdcMes]);
+    setTimeout(() => {
+      setIsGenerating(false);
+      setAiGenerated(true);
 
-  // -------------------------------------------------------------
-  // SELECTORES DINÁMICOS - PLANES DE CLASE
-  // -------------------------------------------------------------
-  const claseGradosDisponibles = useMemo(() => {
-    const list = Array.from(new Set(planes.map((p) => p.GRADO).filter(Boolean)));
-    return list.length > 0
-      ? list
-      : ["1º de Secundaria", "2º de Secundaria", "3º de Secundaria", "4º de Secundaria", "Inglés Nivel A2", "Inglés Nivel B1"];
-  }, [planes]);
+      const isEnglish = materia.toLowerCase().includes("inglés") || materia.toLowerCase().includes("ingles");
 
-  const claseAsignaturasDisponibles = useMemo(() => {
-    const filtered = planes.filter((p) => !claseGrado || p.GRADO === claseGrado);
-    const list = Array.from(new Set(filtered.map((p) => p.ASIGNATURA).filter(Boolean)));
-    return list.length > 0 ? list : ["Historia Universal", "Historia de Bolivia", "Inglés"];
-  }, [planes, claseGrado]);
-
-  const claseMesesDisponibles = useMemo(() => {
-    const filtered = planes.filter(
-      (p) => (!claseGrado || p.GRADO === claseGrado) && (!claseAsignatura || p.ASIGNATURA === claseAsignatura)
-    );
-    const list = Array.from(new Set(filtered.map((p) => p.MES).filter(Boolean)));
-    return list.length > 0 ? list : ["Septiembre", "Octubre", "Noviembre"];
-  }, [planes, claseGrado, claseAsignatura]);
-
-  const matchingClases = useMemo(() => {
-    return planes.filter(
-      (p) =>
-        (!claseGrado || p.GRADO === claseGrado) &&
-        (!claseAsignatura || p.ASIGNATURA === claseAsignatura) &&
-        (!claseMes || p.MES.toLowerCase() === claseMes.toLowerCase())
-    );
-  }, [planes, claseGrado, claseAsignatura, claseMes]);
-
-  const displayClases = useMemo(() => {
-    if (claseViewMode === "ALL") return matchingClases;
-    return matchingClases.filter((c) => String(c.CLASE_NUM) === String(claseViewMode));
-  }, [matchingClases, claseViewMode]);
+      if (activeMode === "pdc") {
+        updatePdcTemplate({
+          nroPdc: `0${Math.floor(Math.random() * 8) + 1}/2026`,
+          perfilesSalida: isEnglish
+            ? `Comprende y produce textos orales y escritos en inglés nivel MCER sobre "${tema}", interactuando con fluidez en situaciones comunicativas reales (${grado}).`
+            : `Demuestra dominio analítico y crítico sobre "${tema}" en ${materia} (${grado}), aplicando el enfoque sociocomunitario productivo.`,
+          objetivoHolistico: isEnglish
+            ? `Fortalecemos la empatía intercultural y confianza expresiva (SER), apropiándonos de estructuras gramaticales y vocabulario clave en torno a "${tema}" (SABER), mediante diálogos guiados, role-plays y redacción creativa (HACER), para comunicarnos de forma efectiva en contextos globales (DECIDIR).`
+            : `Fortalecemos la conciencia crítica y comunitaria (SER), investigando a profundidad los aspectos fundamentales de "${tema}" (SABER), mediante la producción colaborativa de informes, mapas y esquemas explicativos (HACER), para transformar la realidad social de nuestro entorno escolar (DECIDIR).`,
+          contenidos: isEnglish
+            ? `1. Core Vocabulary & Contextual Expressions: ${tema}.\n2. Functional Grammar Structures in real-life dialogues.\n3. Listening & Reading comprehension workshop.\n4. Guided Speaking & Written production task.`
+            : `1. Marco introductorio y conceptualización de ${tema}.\n2. Análisis de antecedentes, causas y contextos clave.\n3. Impacto y relevancia contemporánea en Bolivia y el mundo.\n4. Propuestas y conclusiones reflexivas del estudiantado.`,
+          practica: isEnglish
+            ? `• Warm-up comunicativo con tarjetas visuales y audio auténtico sobre "${tema}".\n• Lluvia de ideas en parejas activando vocabulario previo.`
+            : `• Observación directa y diálogo comunitario problematizador sobre "${tema}".\n• Recuperación de saberes locales y formulación de hipótesis en equipo.`,
+          teoria: isEnglish
+            ? `• Sistematización guiada de reglas gramaticales y pronunciación en pizarra interactiva.\n• Análisis comparativo de modelos textuales auténticos.`
+            : `• Conceptualización teórica sustentada en fuentes bibliográficas oficiales del SEP.\n• Sistematización colectiva de conceptos clave y cuadros comparativos.`,
+          valoracion: `• Reflexión ética sobre el impacto personal, cultural y social de "${tema}".\n• Autoevaluación y coevaluación del trabajo colaborativo en aula.`,
+          produccion: isEnglish
+            ? `• Presentación oral grabada / diálogo escenificado y redacción de dossier ilustrado sobre "${tema}".`
+            : `• Elaboración de producto final tangible: ensayo estructurado, infografía o panel mural sobre "${tema}".`,
+          materialVida: "Experiencias cotidianas, artículos de prensa local y archivo comunitario.",
+          materialDigital: "Fielding App, proyector multimedia, audios interactivos y recursos Google Workspace.",
+          criterioSer: `Demuestra respeto, puntualidad y responsabilidad ética al debatir sobre "${tema}".`,
+          criterioSaber: `Explica con precisión conceptual los fundamentos y estructura de "${tema}" en ${materia}.`,
+          criterioHacer: `Produce evidencias prácticas originales aplicando metodologías activas y rigor formal.`,
+          adaptacionCurricular: "Apoyos visuales escalonados, glosario ilustrado y tiempos flexibles de producción.",
+          producto: `Portafolio temático y presentación demostrativa sobre "${tema}" (${mes} 2026).`,
+          competencia: `Análisis crítico, resolución colaborativa y comunicación efectiva en ${materia}.`,
+        });
+      } else {
+        updatePlanTemplate({
+          claseNro: `${Math.floor(Math.random() * 20) + 10}`,
+          objetivo: `Desarrollar el razonamiento reflexivo y práctico en ${materia} (${grado}) a través del estudio aplicado de "${tema}".`,
+          competencia: `Aplica estrategias metodológicas activas para comprender, debatir y resolver consignas vinculadas a "${tema}".`,
+          capacidades: `Comprensión analítica, síntesis visual, argumentación oral y trabajo colaborativo en ${materia}.`,
+          actitudesSer: "Escucha activa, respeto por las ideas diversas, solidaridad y responsabilidad en el aula.",
+          indicadoresSaber: `Identifica y relaciona los conceptos esenciales de "${tema}" con ejemplos contextualizados.`,
+          indicadoresHacer: `Elabora una síntesis estructurada y expone sus hallazgos cumpliendo la rúbrica de clase.`,
+          faseInicio: `Activación de conocimientos previos sobre "${tema}" mediante dinámica de preguntas detonantes y estímulo visual en pizarra (10 min).`,
+          faseAdquisicion: `Exposición dialogada y lectura guiada de fuentes clave profundizando los conceptos centrales de "${tema}" (25 min).`,
+          faseAplicacion: `Taller de producción práctica en equipos: resolución de guía de análisis y elaboración de organizador gráfico (35 min).`,
+          faseEvaluacion: `Cierre metacognitivo, socialización de conclusiones y registro en cuaderno pedagógico (SER 10 / SABER 45 / HACER 40) (10 min).`,
+          recursos: "Pizarra interactiva, fichas de trabajo impreso, plataforma Fielding App, cuadernos y marcadores.",
+        });
+      }
+    }, 1200);
+  };
 
   const handlePrint = () => {
+    document.body.dataset.printMode = "curriculum";
+    const cleanup = () => {
+      delete document.body.dataset.printMode;
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
     window.print();
   };
 
   return (
     <div className="space-y-6">
-      {/* ESTILOS DE IMPRESIÓN ESTRICTOS FORMATO CARTA */}
-      <style jsx global>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          #curriculum-printable,
-          #curriculum-printable * {
-            visibility: visible;
-          }
-          #curriculum-printable {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            margin: 0;
-            padding: 0;
-            background: white !important;
-            font-family: Arial, Helvetica, sans-serif !important;
-            color: #000 !important;
-          }
-          .print-hidden {
-            display: none !important;
-          }
-          @page {
-            size: letter portrait;
-            margin: 1.2cm 1cm 1.2cm 1cm;
-          }
-          .pdc-doc-container {
-            page-break-inside: auto;
-          }
-          .clase-item-break {
-            page-break-inside: avoid;
-            break-inside: avoid;
-            margin-bottom: 2rem;
-          }
-        }
-      `}</style>
+      {/* PANEL SUPERIOR DE CONTROLES (Oculto en Impresión) */}
+      <div className="no-print bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setActiveMode("pdc")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+                activeMode === "pdc"
+                  ? "bg-[#266b31] text-white shadow-md"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span>PDC Mensual</span>
+            </button>
+            <button
+              onClick={() => setActiveMode("planes")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+                activeMode === "planes"
+                  ? "bg-[#266b31] text-white shadow-md"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              <BookOpen className="w-4 h-4" />
+              <span>Plan de Clase</span>
+            </button>
+          </div>
 
-      {/* BARRA SUPERIOR DE CONTROL (NO IMPRIMIBLE) */}
-      <div className="print-hidden bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handleGenerateAI}
+              disabled={isGenerating}
+              className="flex items-center gap-2 bg-gradient-to-r from-[#d6a427] to-[#b88c22] hover:opacity-95 text-[#1b4e23] font-black px-4 py-2.5 rounded-xl text-sm shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Generando con IA...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  <span>✨ Generar con IA (Demo)</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-2 bg-[#266b31] hover:bg-[#1b4e23] text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow-md transition-all active:scale-95 cursor-pointer"
+            >
+              <Printer className="w-4 h-4" />
+              <span>🖨️ Imprimir Formato Carta</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Feedback visual durante la generación IA */}
+        {isGenerating && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3 text-xs text-amber-900 font-semibold animate-pulse">
+            <Loader2 className="w-4 h-4 animate-spin text-[#d6a427]" />
+            <span>{generationStep}</span>
+          </div>
+        )}
+
+        {aiGenerated && !isGenerating && (
+          <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-800">
+            <div className="flex items-center gap-2 font-medium">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>
+                ¡Documento pedagógico generado con IA y guardado automáticamente! Todos los campos
+                son editables antes de imprimir.
+              </span>
+            </div>
+            <button
+              onClick={() => setAiGenerated(false)}
+              className="text-[11px] text-emerald-700 underline font-semibold cursor-pointer"
+            >
+              Ocultar
+            </button>
+          </div>
+        )}
+
+        {/* Filtros por Asignatura, Grado, Mes y Tema */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 bg-[#266b31] text-white text-[10px] font-bold rounded uppercase tracking-wider">
-                Gestión Curricular SEP
-              </span>
-              <span className="text-xs text-slate-500 font-semibold">
-                Docente: Lic. Ivan Ezequiel Mancilla Copa
-              </span>
-            </div>
-            <h2 className="text-xl font-black text-slate-900 mt-1 uppercase tracking-tight">
-              Planificación Curricular e Impresión Oficial
-            </h2>
-            <p className="text-xs text-slate-500">
-              Genera e imprime Planes de Desarrollo Curricular (PDC) y Planes de Clase en tamaño Carta.
-            </p>
+            <label className="block font-bold text-slate-700 mb-1">Asignatura</label>
+            <select
+              value={materia}
+              onChange={(e) => setFilter("materia", e.target.value)}
+              className="w-full bg-[#FAFAF0] border border-slate-300 rounded-lg p-2 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#266b31]"
+            >
+              <option value="Historia de Bolivia">Historia de Bolivia</option>
+              <option value="Historia Universal">Historia Universal</option>
+              <option value="Inglés (Nivel B1-A)">Inglés (Nivel B1-A)</option>
+              <option value="Ciencias Sociales">Ciencias Sociales</option>
+              <option value="Lenguaje y Comunicación">Lenguaje y Comunicación</option>
+              <option value="Matemática">Matemática</option>
+            </select>
           </div>
 
-          {/* Botón de Impresión */}
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[#d6a427] hover:bg-[#b88c1f] text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
-          >
-            <Printer className="w-4 h-4" />
-            <span>🖨️ Imprimir Documento (Formato Carta)</span>
-          </button>
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Grado / Año</label>
+            <select
+              value={grado}
+              onChange={(e) => setFilter("grado", e.target.value)}
+              className="w-full bg-[#FAFAF0] border border-slate-300 rounded-lg p-2 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#266b31]"
+            >
+              <option value="1ro de Secundaria">1ro de Secundaria</option>
+              <option value="2do de Secundaria">2do de Secundaria</option>
+              <option value="3ro de Secundaria">3ro de Secundaria</option>
+              <option value="4to de Secundaria">4to de Secundaria</option>
+              <option value="4to de Primaria">4to de Primaria</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Mes</label>
+            <select
+              value={mes}
+              onChange={(e) => setFilter("mes", e.target.value)}
+              className="w-full bg-[#FAFAF0] border border-slate-300 rounded-lg p-2 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#266b31]"
+            >
+              {[
+                "Febrero",
+                "Marzo",
+                "Abril",
+                "Mayo",
+                "Junio",
+                "Julio",
+                "Agosto",
+                "Septiembre",
+                "Octubre",
+                "Noviembre",
+              ].map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Tema Curricular</label>
+            <input
+              type="text"
+              value={tema}
+              onChange={(e) => setFilter("tema", e.target.value)}
+              placeholder="Ej: La Guerra del Pacífico..."
+              className="w-full bg-[#FAFAF0] border border-slate-300 rounded-lg p-2 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#266b31]"
+            />
+          </div>
         </div>
-
-        {/* SELECTOR DE MODO */}
-        <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-          <button
-            type="button"
-            onClick={() => setActiveMode("pdc")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-              activeMode === "pdc"
-                ? "bg-[#1b4e23] text-white shadow-md"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            <FileText className="w-4 h-4 text-[#d6a427]" />
-            <span>📄 Generador de PDC Mensual</span>
-            <span className="px-1.5 py-0.2 bg-white/20 rounded text-[10px]">
-              {pdcs.length} PDCs
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveMode("planes")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-              activeMode === "planes"
-                ? "bg-[#1b4e23] text-white shadow-md"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            <BookOpen className="w-4 h-4 text-[#d6a427]" />
-            <span>📚 Generador de Planes de Clase</span>
-            <span className="px-1.5 py-0.2 bg-white/20 rounded text-[10px]">
-              {planes.length} Clases
-            </span>
-          </button>
-        </div>
-
-        {/* FILTROS EN CASCADA MODO PDC */}
-        {activeMode === "pdc" && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-            <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                1. Asignatura / Materia
-              </label>
-              <select
-                value={pdcMateria}
-                onChange={(e) => setPdcMateria(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 uppercase focus:ring-2 focus:ring-[#266b31]"
-              >
-                {pdcMateriasDisponibles.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                2. Año de Escolaridad / Grado
-              </label>
-              <select
-                value={pdcAnio}
-                onChange={(e) => setPdcAnio(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 uppercase focus:ring-2 focus:ring-[#266b31]"
-              >
-                {pdcAniosDisponibles.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                3. Mes Planificado
-              </label>
-              <select
-                value={pdcMes}
-                onChange={(e) => setPdcMes(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 uppercase focus:ring-2 focus:ring-[#266b31]"
-              >
-                {pdcMesesDisponibles.map((mes) => (
-                  <option key={mes} value={mes}>
-                    {mes}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
-
-        {/* FILTROS EN CASCADA MODO PLANES DE CLASE */}
-        {activeMode === "planes" && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-            <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                1. Grado / Nivel
-              </label>
-              <select
-                value={claseGrado}
-                onChange={(e) => setClaseGrado(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 uppercase focus:ring-2 focus:ring-[#266b31]"
-              >
-                {claseGradosDisponibles.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                2. Asignatura
-              </label>
-              <select
-                value={claseAsignatura}
-                onChange={(e) => setClaseAsignatura(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 uppercase focus:ring-2 focus:ring-[#266b31]"
-              >
-                {claseAsignaturasDisponibles.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                3. Mes
-              </label>
-              <select
-                value={claseMes}
-                onChange={(e) => setClaseMes(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 uppercase focus:ring-2 focus:ring-[#266b31]"
-              >
-                {claseMesesDisponibles.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                4. Visualización / Impresión
-              </label>
-              <select
-                value={claseViewMode}
-                onChange={(e) => setClaseViewMode(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-black text-[#1b4e23] uppercase focus:ring-2 focus:ring-[#266b31]"
-              >
-                <option value="ALL">📚 TODAS LAS CLASES DEL MES ({matchingClases.length})</option>
-                {matchingClases.map((c) => (
-                  <option key={c.CLASE_NUM} value={c.CLASE_NUM}>
-                    Solo Clase Nro. {c.CLASE_NUM}: {c.TEMA ? c.TEMA.slice(0, 28) + "..." : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* ------------------------------------------------------------- */}
-      {/* CONTENEDOR DE IMPRESIÓN OFICIAL TAMAÑO CARTA                    */}
-      {/* ------------------------------------------------------------- */}
+      {/* DOCUMENTO PEDAGÓGICO FORMATEADO PARA IMPRESIÓN CARTA */}
       <div
-        id="curriculum-printable"
-        className="bg-white rounded-2xl shadow-xl border border-slate-300 p-6 sm:p-10 text-slate-900 font-sans print:p-0 print:border-none print:shadow-none print:rounded-none"
-        style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
+        id="curriculum-print-container"
+        className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm text-slate-900 space-y-5"
       >
-        {/* ============================================================= */}
-        {/* VISTA A: PLAN DE DESARROLLO CURRICULAR (PDC)                 */}
-        {/* ============================================================= */}
+        {/* MEMBRETE INSTITUCIONAL OFICIAL */}
+        <div className="flex items-center justify-between border-b-2 border-[#266b31] pb-4">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-white border border-slate-200 rounded-lg p-1 flex items-center justify-center">
+              <img
+                src="https://i.imgur.com/wjibHTr.png"
+                alt="Colegio Fielding Bolivia"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = "none";
+                }}
+              />
+            </div>
+            <div>
+              <h1 className="text-xl font-black text-[#266b31] tracking-wide uppercase">
+                UNIDAD EDUCATIVA FIELDING BOLIVIA
+              </h1>
+              <p className="text-xs font-bold text-slate-600">
+                SISTEMA EDUCATIVO PLURINACIONAL • VICEMINISTERIO DE EDUCACIÓN REGULAR
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Distrito Educativo Sucre • Departamento de Chuquisaca
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="inline-block bg-[#d6a427]/20 text-[#1b4e23] font-black text-xs px-2.5 py-1 rounded">
+              GESTIÓN 2026
+            </span>
+            <p className="text-xs font-bold text-slate-700 mt-1">
+              {activeMode === "pdc" ? "PLAN DE DESARROLLO CURRICULAR" : "PLAN DE CLASE DIARIO"}
+            </p>
+            <p className="text-[10px] text-slate-500">Documento Técnico Pedagógico</p>
+          </div>
+        </div>
+
+        {/* MODO PDC MENSUAL */}
         {activeMode === "pdc" && (
-          <div className="pdc-doc-container space-y-4 text-xs leading-normal text-black">
-            {selectedPDC ? (
-              <>
-                {/* 1. MEMBRETE CENTRADO */}
-                <div className="text-center mb-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="https://i.imgur.com/wjibHTr.png"
-                    alt="Membrete Oficial"
-                    className="mx-auto max-h-[110px] object-contain"
+          <div className="space-y-4 text-xs">
+            <div className="text-center">
+              <h2 className="text-base font-black tracking-wide text-slate-900 uppercase underline decoration-[#266b31] decoration-2">
+                PLAN DE DESARROLLO CURRICULAR N° {pdcTemplate.nroPdc}
+              </h2>
+            </div>
+
+            {/* TABLA REFERENCIAL */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-[#FAFAF0] p-3 rounded-lg border border-slate-200 text-[11px]">
+              <div>
+                <span className="font-bold text-slate-500 block">Distrito Educativo:</span>
+                <span className="font-semibold text-slate-800">{pdcTemplate.distrito}</span>
+              </div>
+              <div>
+                <span className="font-bold text-slate-500 block">Maestro/a Encargado:</span>
+                <span className="font-bold text-[#266b31]">{pdcTemplate.docente}</span>
+              </div>
+              <div>
+                <span className="font-bold text-slate-500 block">Asignatura:</span>
+                <span className="font-bold text-slate-800">{materia}</span>
+              </div>
+              <div>
+                <span className="font-bold text-slate-500 block">Año de Escolaridad:</span>
+                <span className="font-bold text-slate-800">{grado}</span>
+              </div>
+              <div>
+                <span className="font-bold text-slate-500 block">Unidad Educativa:</span>
+                <span className="font-semibold text-slate-800">{pdcTemplate.unidadEducativa}</span>
+              </div>
+              <div>
+                <span className="font-bold text-slate-500 block">Mes:</span>
+                <span className="font-semibold text-slate-800">{mes} 2026</span>
+              </div>
+              <div>
+                <span className="font-bold text-slate-500 block">Director/a:</span>
+                <span className="font-semibold text-slate-800">{pdcTemplate.director}</span>
+              </div>
+              <div>
+                <span className="font-bold text-slate-500 block">Nivel Educativo:</span>
+                <span className="font-semibold text-slate-800">
+                  {grado.includes("Primaria") ? "Primaria Vocacional" : "Secundaria Productiva"}
+                </span>
+              </div>
+            </div>
+
+            {/* PERFILES DE SALIDA Y OBJETIVO HOLÍSTICO */}
+            <div className="border border-slate-800 rounded overflow-hidden">
+              <div className="p-2.5 bg-slate-100 border-b border-slate-800 flex flex-col gap-1">
+                <span className="font-black text-slate-900 uppercase text-[10px]">
+                  PERFILES DE SALIDA:
+                </span>
+                <textarea
+                  rows={2}
+                  value={pdcTemplate.perfilesSalida}
+                  onChange={(e) => updatePdcTemplate({ perfilesSalida: e.target.value })}
+                  className="print:hidden w-full bg-transparent font-medium text-slate-800 border-none resize-y focus:outline-none focus:ring-1 focus:ring-[#266b31] rounded p-1 text-xs"
+                />
+                <p className="hidden print:block whitespace-pre-wrap font-medium text-slate-800 text-xs">
+                  {pdcTemplate.perfilesSalida}
+                </p>
+              </div>
+              <div className="p-2.5 bg-white flex flex-col gap-1">
+                <span className="font-black text-[#266b31] uppercase text-[10px]">
+                  OBJETIVO HOLÍSTICO:
+                </span>
+                <textarea
+                  rows={3}
+                  value={pdcTemplate.objetivoHolistico}
+                  onChange={(e) => updatePdcTemplate({ objetivoHolistico: e.target.value })}
+                  className="print:hidden w-full bg-transparent font-medium text-slate-800 border-none resize-y focus:outline-none focus:ring-1 focus:ring-[#266b31] rounded p-1 text-xs leading-relaxed"
+                />
+                <p className="hidden print:block whitespace-pre-wrap font-medium text-slate-800 text-xs leading-relaxed">
+                  {pdcTemplate.objetivoHolistico}
+                </p>
+              </div>
+            </div>
+
+            {/* MATRIZ DE 4 COLUMNAS OFICIALES */}
+            <div className="border border-slate-800 rounded overflow-hidden">
+              <div className="grid grid-cols-12 bg-[#1b4e23] text-white font-bold text-[10px] uppercase text-center">
+                <div className="col-span-3 p-2 border-r border-white/20">CONTENIDOS (25%)</div>
+                <div className="col-span-4 p-2 border-r border-white/20">
+                  ORIENTACIONES METODOLÓGICAS (30%)
+                </div>
+                <div className="col-span-2 p-2 border-r border-white/20">RECURSOS (20%)</div>
+                <div className="col-span-3 p-2">CRITERIOS DE EVALUACIÓN (25%)</div>
+              </div>
+
+              <div className="grid grid-cols-12 text-slate-800 divide-x divide-slate-800 bg-white">
+                {/* 1. CONTENIDOS */}
+                <div className="col-span-3 p-2.5">
+                  <textarea
+                    rows={12}
+                    value={pdcTemplate.contenidos}
+                    onChange={(e) => updatePdcTemplate({ contenidos: e.target.value })}
+                    className="print:hidden w-full h-full bg-transparent border-none resize-none focus:outline-none text-xs leading-relaxed"
                   />
-                </div>
-
-                {/* 2. TÍTULO CENTRADO SUBRAYADO */}
-                <div className="text-center my-3">
-                  <h2 className="text-base sm:text-lg font-bold underline uppercase tracking-wider text-black">
-                    PLAN DE DESARROLLO CURRICULAR N° {selectedPDC.nro_pdc || "1"}
-                  </h2>
-                </div>
-
-                {/* 3. TABLA REFERENCIAL SIN BORDES VISIBLES */}
-                <table className="w-full border-collapse text-[11px] mb-3 border-none">
-                  <tbody>
-                    <tr>
-                      <td className="py-1 pr-2 w-1/2">
-                        <strong>Distrito:</strong> {selectedPDC.distrito}
-                      </td>
-                      <td className="py-1 pl-2 w-1/2">
-                        <strong>Unidad Educativa:</strong> {selectedPDC.unidad_educativa}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 pr-2">
-                        <strong>Maestro/a encargado:</strong> {selectedPDC.maestro}
-                      </td>
-                      <td className="py-1 pl-2">
-                        <strong>Mes:</strong> {selectedPDC.mes}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 pr-2">
-                        <strong>Nivel Educativo:</strong> {selectedPDC.nivel}
-                      </td>
-                      <td className="py-1 pl-2">
-                        <strong>Director/a:</strong> {selectedPDC.director}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 pr-2">
-                        <strong>Asignatura:</strong> {selectedPDC.asignatura}
-                      </td>
-                      <td className="py-1 pl-2">
-                        <strong>Año de escolaridad:</strong> {selectedPDC.anio_escolaridad}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                {/* 4. TABLA CON BORDES NEGROS: PERFILES DE SALIDA Y OBJETIVO */}
-                <table
-                  className="w-full border-collapse text-[11px] mb-3"
-                  style={{ border: "1px solid #000" }}
-                >
-                  <tbody>
-                    <tr style={{ borderBottom: "1px solid #000" }}>
-                      <td
-                        className="p-2 font-bold uppercase w-1/4 align-top"
-                        style={{ borderRight: "1px solid #000", backgroundColor: "#f8fafc" }}
-                      >
-                        PERFILES DE SALIDA:
-                      </td>
-                      <td className="p-2 align-top text-justify">
-                        {selectedPDC.perfiles_salida}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        className="p-2 font-bold uppercase w-1/4 align-top"
-                        style={{ borderRight: "1px solid #000", backgroundColor: "#f8fafc" }}
-                      >
-                        OBJETIVO:
-                      </td>
-                      <td className="p-2 align-top text-justify">
-                        {selectedPDC.objetivo_holistico}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                {/* 5. TABLA MATRIZ DE 4 COLUMNAS CON BORDES NEGROS */}
-                <table
-                  className="w-full border-collapse text-[11px] mb-3"
-                  style={{ border: "1px solid #000" }}
-                >
-                  <thead>
-                    <tr style={{ backgroundColor: "#f1f5f9", borderBottom: "1px solid #000" }}>
-                      <th
-                        className="p-2 font-bold text-center uppercase"
-                        style={{ width: "25%", borderRight: "1px solid #000" }}
-                      >
-                        CONTENIDOS A DESARROLLAR
-                      </th>
-                      <th
-                        className="p-2 font-bold text-center uppercase"
-                        style={{ width: "30%", borderRight: "1px solid #000" }}
-                      >
-                        ORIENTACIONES METODOLÓGICAS
-                      </th>
-                      <th
-                        className="p-2 font-bold text-center uppercase"
-                        style={{ width: "20%", borderRight: "1px solid #000" }}
-                      >
-                        RECURSOS
-                      </th>
-                      <th
-                        className="p-2 font-bold text-center uppercase"
-                        style={{ width: "25%" }}
-                      >
-                        CRITERIOS DE EVALUACIÓN
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      {/* CONTENIDOS (25%) */}
-                      <td
-                        className="p-2 align-top text-justify"
-                        style={{ borderRight: "1px solid #000" }}
-                      >
-                        {selectedPDC.contenidos}
-                      </td>
-
-                      {/* ORIENTACIONES METODOLÓGICAS (30%) */}
-                      <td
-                        className="p-2 align-top space-y-2 text-justify"
-                        style={{ borderRight: "1px solid #000" }}
-                      >
-                        {selectedPDC.practica && (
-                          <div>
-                            <strong>PRÁCTICA:</strong> {selectedPDC.practica}
-                          </div>
-                        )}
-                        {selectedPDC.teoria && (
-                          <div className="mt-1">
-                            <strong>TEORÍA:</strong> {selectedPDC.teoria}
-                          </div>
-                        )}
-                        {selectedPDC.valoracion && (
-                          <div className="mt-1">
-                            <strong>VALORACIÓN:</strong> {selectedPDC.valoracion}
-                          </div>
-                        )}
-                        {selectedPDC.produccion && (
-                          <div className="mt-1">
-                            <strong>PRODUCCIÓN:</strong> {selectedPDC.produccion}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* RECURSOS (20%) */}
-                      <td
-                        className="p-2 align-top space-y-2 text-justify"
-                        style={{ borderRight: "1px solid #000" }}
-                      >
-                        {selectedPDC.materiales_vida && (
-                          <div>
-                            <strong>MATERIALES DE LA VIDA:</strong> {selectedPDC.materiales_vida}
-                          </div>
-                        )}
-                        {selectedPDC.materiales_analogicos && (
-                          <div className="mt-1">
-                            <strong>MATERIALES ANALÓGICOS/DIGITALES:</strong>{" "}
-                            {selectedPDC.materiales_analogicos}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* CRITERIOS DE EVALUACIÓN (25%) */}
-                      <td className="p-2 align-top space-y-2 text-justify">
-                        {selectedPDC.ser && (
-                          <div>
-                            <strong>SER:</strong> {selectedPDC.ser}
-                          </div>
-                        )}
-                        {selectedPDC.saber && (
-                          <div className="mt-1">
-                            <strong>SABER:</strong> {selectedPDC.saber}
-                          </div>
-                        )}
-                        {selectedPDC.hacer && (
-                          <div className="mt-1">
-                            <strong>HACER:</strong> {selectedPDC.hacer}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                {/* 6. TABLA INFERIOR CON BORDES NEGROS */}
-                <table
-                  className="w-full border-collapse text-[11px] mb-6"
-                  style={{ border: "1px solid #000" }}
-                >
-                  <tbody>
-                    <tr style={{ borderBottom: "1px solid #000" }}>
-                      <td
-                        className="p-2 font-bold uppercase w-1/4 align-top"
-                        style={{ borderRight: "1px solid #000", backgroundColor: "#f8fafc" }}
-                      >
-                        ADAPTACIÓN CURRICULAR:
-                      </td>
-                      <td className="p-2 align-top text-justify">
-                        {selectedPDC.adaptacion_curricular || "No requerida"}
-                      </td>
-                    </tr>
-                    <tr style={{ borderBottom: "1px solid #000" }}>
-                      <td
-                        className="p-2 font-bold uppercase w-1/4 align-top"
-                        style={{ borderRight: "1px solid #000", backgroundColor: "#f8fafc" }}
-                      >
-                        PRODUCTO:
-                      </td>
-                      <td className="p-2 align-top text-justify">{selectedPDC.producto}</td>
-                    </tr>
-                    <tr>
-                      <td
-                        className="p-2 font-bold uppercase w-1/4 align-top"
-                        style={{ borderRight: "1px solid #000", backgroundColor: "#f8fafc" }}
-                      >
-                        COMPETENCIA:
-                      </td>
-                      <td className="p-2 align-top text-justify">{selectedPDC.competencia}</td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                {/* 7. PIE DE PÁGINA: FECHA Y FIRMAS */}
-                <div className="pt-4">
-                  <p className="italic text-right text-[11px] mb-12">
-                    Sucre, {selectedPDC.fecha_emision || "02/02/2026"}
+                  <p className="hidden print:block whitespace-pre-wrap text-[11px] leading-relaxed">
+                    {pdcTemplate.contenidos}
                   </p>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-12 text-center text-xs">
-                    <div>
-                      <div className="w-56 mx-auto border-t border-black pt-1">
-                        <p className="font-bold uppercase tracking-wider">FIRMA MAESTRA (O)</p>
-                        <p className="text-[10px] text-slate-700">{selectedPDC.maestro}</p>
-                      </div>
+                {/* 2. ORIENTACIONES METODOLÓGICAS */}
+                <div className="col-span-4 p-2.5 space-y-2 text-[11px]">
+                  {(
+                    [
+                      { key: "practica", label: "PRÁCTICA:" },
+                      { key: "teoria", label: "TEORÍA:" },
+                      { key: "valoracion", label: "VALORACIÓN:" },
+                      { key: "produccion", label: "PRODUCCIÓN:" },
+                    ] as const
+                  ).map((item) => (
+                    <div key={item.key}>
+                      <span className="font-black text-slate-900 block text-[10px]">
+                        {item.label}
+                      </span>
+                      <textarea
+                        rows={2}
+                        value={pdcTemplate[item.key]}
+                        onChange={(e) => updatePdcTemplate({ [item.key]: e.target.value })}
+                        className="print:hidden w-full bg-transparent border-none resize-y focus:outline-none text-[11px]"
+                      />
+                      <p className="hidden print:block whitespace-pre-wrap text-[10px]">
+                        {pdcTemplate[item.key]}
+                      </p>
                     </div>
-                    <div>
-                      <div className="w-56 mx-auto border-t border-black pt-1">
-                        <p className="font-bold uppercase tracking-wider">FIRMA DIRECTOR</p>
-                        <p className="text-[10px] text-slate-700">{selectedPDC.director}</p>
-                      </div>
-                    </div>
+                  ))}
+                </div>
+
+                {/* 3. RECURSOS */}
+                <div className="col-span-2 p-2.5 space-y-2 text-[11px]">
+                  <div>
+                    <span className="font-black text-slate-900 block text-[10px]">
+                      MATERIALES DE LA VIDA:
+                    </span>
+                    <textarea
+                      rows={4}
+                      value={pdcTemplate.materialVida}
+                      onChange={(e) => updatePdcTemplate({ materialVida: e.target.value })}
+                      className="print:hidden w-full bg-transparent border-none resize-y focus:outline-none text-[11px]"
+                    />
+                    <p className="hidden print:block whitespace-pre-wrap text-[10px]">
+                      {pdcTemplate.materialVida}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-black text-slate-900 block text-[10px]">
+                      ANALÓGICOS / DIGITALES:
+                    </span>
+                    <textarea
+                      rows={4}
+                      value={pdcTemplate.materialDigital}
+                      onChange={(e) => updatePdcTemplate({ materialDigital: e.target.value })}
+                      className="print:hidden w-full bg-transparent border-none resize-y focus:outline-none text-[11px]"
+                    />
+                    <p className="hidden print:block whitespace-pre-wrap text-[10px]">
+                      {pdcTemplate.materialDigital}
+                    </p>
                   </div>
                 </div>
-              </>
-            ) : (
-              <div className="text-center py-12 text-slate-400">
-                No se encontraron PDCs que coincidan con los filtros seleccionados.
+
+                {/* 4. CRITERIOS DE EVALUACIÓN */}
+                <div className="col-span-3 p-2.5 space-y-2 text-[11px]">
+                  <div>
+                    <span className="font-black text-emerald-800 block text-[10px]">
+                      SER (10 pts):
+                    </span>
+                    <textarea
+                      rows={2}
+                      value={pdcTemplate.criterioSer}
+                      onChange={(e) => updatePdcTemplate({ criterioSer: e.target.value })}
+                      className="print:hidden w-full bg-transparent border-none resize-y focus:outline-none text-[11px]"
+                    />
+                    <p className="hidden print:block whitespace-pre-wrap text-[10px]">
+                      {pdcTemplate.criterioSer}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-black text-blue-800 block text-[10px]">
+                      SABER (45 pts):
+                    </span>
+                    <textarea
+                      rows={3}
+                      value={pdcTemplate.criterioSaber}
+                      onChange={(e) => updatePdcTemplate({ criterioSaber: e.target.value })}
+                      className="print:hidden w-full bg-transparent border-none resize-y focus:outline-none text-[11px]"
+                    />
+                    <p className="hidden print:block whitespace-pre-wrap text-[10px]">
+                      {pdcTemplate.criterioSaber}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-black text-amber-800 block text-[10px]">
+                      HACER (40 pts):
+                    </span>
+                    <textarea
+                      rows={3}
+                      value={pdcTemplate.criterioHacer}
+                      onChange={(e) => updatePdcTemplate({ criterioHacer: e.target.value })}
+                      className="print:hidden w-full bg-transparent border-none resize-y focus:outline-none text-[11px]"
+                    />
+                    <p className="hidden print:block whitespace-pre-wrap text-[10px]">
+                      {pdcTemplate.criterioHacer}
+                    </p>
+                  </div>
+                </div>
               </div>
-            )}
+            </div>
+
+            {/* TABLA INFERIOR */}
+            <div className="grid grid-cols-3 border border-slate-800 rounded divide-x divide-slate-800 text-[11px] bg-slate-50">
+              <div className="p-2">
+                <span className="font-black text-slate-900 block uppercase text-[10px]">
+                  ADAPTACIÓN CURRICULAR:
+                </span>
+                <textarea
+                  rows={2}
+                  value={pdcTemplate.adaptacionCurricular}
+                  onChange={(e) => updatePdcTemplate({ adaptacionCurricular: e.target.value })}
+                  className="print:hidden w-full bg-transparent border-none resize-y focus:outline-none text-[11px]"
+                />
+                <p className="hidden print:block whitespace-pre-wrap text-[10px]">
+                  {pdcTemplate.adaptacionCurricular}
+                </p>
+              </div>
+              <div className="p-2">
+                <span className="font-black text-slate-900 block uppercase text-[10px]">
+                  PRODUCTO:
+                </span>
+                <textarea
+                  rows={2}
+                  value={pdcTemplate.producto}
+                  onChange={(e) => updatePdcTemplate({ producto: e.target.value })}
+                  className="print:hidden w-full bg-transparent border-none resize-y focus:outline-none text-[11px]"
+                />
+                <p className="hidden print:block whitespace-pre-wrap text-[10px]">
+                  {pdcTemplate.producto}
+                </p>
+              </div>
+              <div className="p-2">
+                <span className="font-black text-slate-900 block uppercase text-[10px]">
+                  COMPETENCIA:
+                </span>
+                <textarea
+                  rows={2}
+                  value={pdcTemplate.competencia}
+                  onChange={(e) => updatePdcTemplate({ competencia: e.target.value })}
+                  className="print:hidden w-full bg-transparent border-none resize-y focus:outline-none text-[11px]"
+                />
+                <p className="hidden print:block whitespace-pre-wrap text-[10px]">
+                  {pdcTemplate.competencia}
+                </p>
+              </div>
+            </div>
+
+            {/* PIE DE PÁGINA Y FIRMAS */}
+            <div className="pt-6">
+              <p className="italic text-right text-slate-600 text-[10px] mb-8">
+                Sucre,{" "}
+                {new Date().toLocaleDateString("es-BO", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </p>
+              <div className="grid grid-cols-2 gap-16 text-center text-xs">
+                <div className="border-t border-slate-500 pt-1">
+                  <p className="font-bold text-slate-800">{pdcTemplate.docente}</p>
+                  <p className="text-[10px] text-slate-500">FIRMA MAESTRO(A)</p>
+                </div>
+                <div className="border-t border-slate-500 pt-1">
+                  <p className="font-bold text-slate-800">{pdcTemplate.director}</p>
+                  <p className="text-[10px] text-slate-500">FIRMA DIRECTOR GENERAL</p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* ============================================================= */}
-        {/* VISTA B: PLANES DE CLASE                                     */}
-        {/* ============================================================= */}
+        {/* MODO PLAN DE CLASE */}
         {activeMode === "planes" && (
-          <div className="space-y-8 text-black">
-            {displayClases.length > 0 ? (
-              displayClases.map((clase, idx) => (
-                <div key={clase.CLASE_NUM || idx} className="clase-item-break space-y-4">
-                  {/* Encabezado de la Clase */}
-                  <div className="border-b-2 border-black pb-2 flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <h3 className="font-bold text-sm sm:text-base uppercase tracking-wide">
-                        I. DATOS Y COMPETENCIAS - CLASE NRO. {clase.CLASE_NUM}
-                      </h3>
-                      <p className="text-[11px] text-slate-800">
-                        <strong>Docente:</strong> {clase.DOCENTE} • <strong>Asignatura:</strong>{" "}
-                        {clase.ASIGNATURA} • <strong>Nivel:</strong> {clase.GRADO} •{" "}
-                        <strong>Mes:</strong> {clase.MES}
+          <div className="space-y-4 text-xs">
+            <div className="text-center">
+              <h2 className="text-base font-black tracking-wide text-slate-900 uppercase underline decoration-[#266b31] decoration-2">
+                PLAN DE CLASE N° {planTemplate.claseNro} - {materia.toUpperCase()}
+              </h2>
+            </div>
+
+            {/* BLOQUE I: DATOS Y COMPETENCIAS */}
+            <div className="border border-slate-800 rounded p-3 bg-[#FAFAF0] space-y-2.5">
+              <span className="font-black text-slate-900 uppercase text-[11px] block border-b border-slate-300 pb-1">
+                I. DATOS INFORMATIVOS Y COMPETENCIAS
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                <div>
+                  <span className="font-bold text-slate-500 block">Docente:</span>
+                  <span className="font-bold text-[#266b31]">{planTemplate.docente}</span>
+                </div>
+                <div>
+                  <span className="font-bold text-slate-500 block">Grado / Nivel:</span>
+                  <span className="font-semibold text-slate-800">{grado}</span>
+                </div>
+                <div>
+                  <span className="font-bold text-slate-500 block">Mes:</span>
+                  <span className="font-semibold text-slate-800">{mes}</span>
+                </div>
+                <div>
+                  <span className="font-bold text-slate-500 block">Clase N°:</span>
+                  <span className="font-bold text-slate-800">{planTemplate.claseNro}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <span className="font-black text-[#266b31] block text-[10px]">
+                    OBJETIVO HOLÍSTICO:
+                  </span>
+                  <textarea
+                    rows={2}
+                    value={planTemplate.objetivo}
+                    onChange={(e) => updatePlanTemplate({ objetivo: e.target.value })}
+                    className="print:hidden w-full bg-white border border-slate-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-[#266b31]"
+                  />
+                  <p className="hidden print:block whitespace-pre-wrap text-[11px] bg-white p-1 rounded">
+                    {planTemplate.objetivo}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-black text-slate-800 block text-[10px]">COMPETENCIA:</span>
+                  <textarea
+                    rows={2}
+                    value={planTemplate.competencia}
+                    onChange={(e) => updatePlanTemplate({ competencia: e.target.value })}
+                    className="print:hidden w-full bg-white border border-slate-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-[#266b31]"
+                  />
+                  <p className="hidden print:block whitespace-pre-wrap text-[11px] bg-white p-1 rounded">
+                    {planTemplate.competencia}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <span className="font-black text-slate-800 block text-[10px]">CAPACIDADES:</span>
+                  <textarea
+                    rows={2}
+                    value={planTemplate.capacidades}
+                    onChange={(e) => updatePlanTemplate({ capacidades: e.target.value })}
+                    className="print:hidden w-full bg-white border border-slate-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-[#266b31]"
+                  />
+                  <p className="hidden print:block whitespace-pre-wrap text-[11px] bg-white p-1 rounded">
+                    {planTemplate.capacidades}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-black text-emerald-800 block text-[10px]">
+                    ACTITUDES Y VALORES (SER - 10 pts):
+                  </span>
+                  <textarea
+                    rows={2}
+                    value={planTemplate.actitudesSer}
+                    onChange={(e) => updatePlanTemplate({ actitudesSer: e.target.value })}
+                    className="print:hidden w-full bg-white border border-slate-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-[#266b31]"
+                  />
+                  <p className="hidden print:block whitespace-pre-wrap text-[11px] bg-white p-1 rounded">
+                    {planTemplate.actitudesSer}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <span className="font-black text-blue-800 block text-[10px]">
+                    CRITERIOS SABER (45 pts):
+                  </span>
+                  <textarea
+                    rows={2}
+                    value={planTemplate.indicadoresSaber}
+                    onChange={(e) => updatePlanTemplate({ indicadoresSaber: e.target.value })}
+                    className="print:hidden w-full bg-white border border-slate-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-[#266b31]"
+                  />
+                  <p className="hidden print:block whitespace-pre-wrap text-[11px] bg-white p-1 rounded">
+                    {planTemplate.indicadoresSaber}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-black text-amber-800 block text-[10px]">
+                    CRITERIOS HACER (40 pts):
+                  </span>
+                  <textarea
+                    rows={2}
+                    value={planTemplate.indicadoresHacer}
+                    onChange={(e) => updatePlanTemplate({ indicadoresHacer: e.target.value })}
+                    className="print:hidden w-full bg-white border border-slate-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-[#266b31]"
+                  />
+                  <p className="hidden print:block whitespace-pre-wrap text-[11px] bg-white p-1 rounded">
+                    {planTemplate.indicadoresHacer}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* BLOQUE II: SECUENCIA DIDÁCTICA */}
+            <div className="border border-slate-800 rounded overflow-hidden">
+              <div className="bg-[#1b4e23] text-white font-bold text-[10px] uppercase p-2">
+                II. SECUENCIA DIDÁCTICA ({tema.toUpperCase()})
+              </div>
+
+              <div className="divide-y divide-slate-800 bg-white text-[11px]">
+                {(
+                  [
+                    { key: "faseInicio", label: "1. INICIO (10 min):" },
+                    { key: "faseAdquisicion", label: "2. ADQUISICIÓN (25 min):" },
+                    { key: "faseAplicacion", label: "3. APLICACIÓN (35 min):" },
+                    { key: "faseEvaluacion", label: "4. EVALUACIÓN (10 min):" },
+                  ] as const
+                ).map((fase) => (
+                  <div key={fase.key} className="grid grid-cols-12 p-2.5 gap-2">
+                    <div className="col-span-3 font-bold text-[#1b4e23] uppercase text-[10px]">
+                      {fase.label}
+                    </div>
+                    <div className="col-span-9">
+                      <textarea
+                        rows={2}
+                        value={planTemplate[fase.key]}
+                        onChange={(e) => updatePlanTemplate({ [fase.key]: e.target.value })}
+                        className="print:hidden w-full bg-transparent border-none resize-y focus:outline-none text-[11px]"
+                      />
+                      <p className="hidden print:block whitespace-pre-wrap text-[11px]">
+                        {planTemplate[fase.key]}
                       </p>
                     </div>
-                    <div className="text-right text-[11px]">
-                      <span className="font-bold uppercase">Fielding Bolivia</span>
-                      <p className="text-slate-500">Gestión {clase.ANO || "2026"}</p>
-                    </div>
                   </div>
-
-                  {/* Bloque I: Objetivo, Competencia, Grillas */}
-                  <div className="space-y-2 text-[11px]">
-                    <div className="p-2.5 bg-slate-50 rounded border border-black/40 text-justify">
-                      <strong className="block uppercase text-[10px] text-slate-700">
-                        Objetivo Holístico:
-                      </strong>
-                      <span>{clase.OBJETIVO_HOLISTICO}</span>
-                    </div>
-
-                    <div className="p-2.5 bg-slate-50 rounded border border-black/40 text-justify">
-                      <strong className="block uppercase text-[10px] text-slate-700">
-                        Competencia:
-                      </strong>
-                      <span>{clase.COMPETENCIA}</span>
-                    </div>
-
-                    {/* Grilla 1: Capacidades y Actitudes (SER) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      <div className="p-2.5 bg-white border border-black rounded text-justify">
-                        <strong className="block uppercase text-[10px] mb-1">Capacidades:</strong>
-                        <div className="whitespace-pre-line">{clase.CAPACIDADES}</div>
-                      </div>
-                      <div className="p-2.5 bg-white border border-black rounded text-justify">
-                        <strong className="block uppercase text-[10px] mb-1">
-                          Actitudes y Valores (Ser):
-                        </strong>
-                        <div className="whitespace-pre-line">{clase.ACTITUDES_SER}</div>
-                      </div>
-                    </div>
-
-                    {/* Grilla 2: Saber y Hacer */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      <div className="p-2.5 bg-white border border-black rounded text-justify">
-                        <strong className="block uppercase text-[10px] mb-1">
-                          Indicadores Saber:
-                        </strong>
-                        <div>{clase.INDICADORES_SABER}</div>
-                      </div>
-                      <div className="p-2.5 bg-white border border-black rounded text-justify">
-                        <strong className="block uppercase text-[10px] mb-1">
-                          Indicadores Hacer:
-                        </strong>
-                        <div>{clase.INDICADORES_HACER}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Bloque II: Secuencia Didáctica */}
-                  <div className="space-y-2 pt-2">
-                    <h4 className="font-bold text-xs uppercase tracking-wide border-b border-black pb-1">
-                      II. SECUENCIA DIDÁCTICA: {clase.TEMA}
-                    </h4>
-
-                    <table
-                      className="w-full border-collapse text-[11px]"
-                      style={{ border: "1px solid #000" }}
-                    >
-                      <thead>
-                        <tr style={{ backgroundColor: "#f1f5f9", borderBottom: "1px solid #000" }}>
-                          <th
-                            className="p-2 text-center font-bold uppercase"
-                            style={{ width: "12%", borderRight: "1px solid #000" }}
-                          >
-                            Fase
-                          </th>
-                          <th
-                            className="p-2 text-center font-bold uppercase"
-                            style={{ width: "53%", borderRight: "1px solid #000" }}
-                          >
-                            Actividades y Estrategias
-                          </th>
-                          <th
-                            className="p-2 text-center font-bold uppercase"
-                            style={{ width: "35%" }}
-                          >
-                            Recursos y Evaluación
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {/* Fila 1: INICIO */}
-                        <tr style={{ borderBottom: "1px solid #000" }}>
-                          <td
-                            className="p-2 font-bold text-center uppercase align-top"
-                            style={{ borderRight: "1px solid #000", backgroundColor: "#f8fafc" }}
-                          >
-                            INICIO
-                          </td>
-                          <td
-                            className="p-2 align-top text-justify"
-                            style={{ borderRight: "1px solid #000" }}
-                          >
-                            {clase.FASE_INICIO}
-                          </td>
-                          {/* Columna 3 con rowSpan={4} */}
-                          <td
-                            rowSpan={4}
-                            className="p-2.5 align-top space-y-2 text-justify"
-                            style={{ backgroundColor: "#fafaf9" }}
-                          >
-                            {clase.RECURSOS && (
-                              <div>
-                                <strong className="block uppercase text-[10px]">Recursos:</strong>
-                                <span>{clase.RECURSOS}</span>
-                              </div>
-                            )}
-                            {clase.INSTRUMENTOS_EVALUACION && (
-                              <div className="mt-2">
-                                <strong className="block uppercase text-[10px]">
-                                  Instrumentos:
-                                </strong>
-                                <span>{clase.INSTRUMENTOS_EVALUACION}</span>
-                              </div>
-                            )}
-                            {clase.EVALUACION_DETALLE && (
-                              <div className="mt-2">
-                                <strong className="block uppercase text-[10px]">
-                                  Evaluación D.:
-                                </strong>
-                                <span>{clase.EVALUACION_DETALLE}</span>
-                              </div>
-                            )}
-                            {clase.ADAPTACIONES && (
-                              <div className="mt-2">
-                                <strong className="block uppercase text-[10px]">
-                                  Adaptaciones:
-                                </strong>
-                                <span>{clase.ADAPTACIONES}</span>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-
-                        {/* Fila 2: ADQUISICIÓN */}
-                        <tr style={{ borderBottom: "1px solid #000" }}>
-                          <td
-                            className="p-2 font-bold text-center uppercase align-top"
-                            style={{ borderRight: "1px solid #000", backgroundColor: "#f8fafc" }}
-                          >
-                            ADQUISICIÓN
-                          </td>
-                          <td
-                            className="p-2 align-top text-justify"
-                            style={{ borderRight: "1px solid #000" }}
-                          >
-                            {clase.FASE_ADQUISICION}
-                          </td>
-                        </tr>
-
-                        {/* Fila 3: APLICACIÓN */}
-                        <tr style={{ borderBottom: "1px solid #000" }}>
-                          <td
-                            className="p-2 font-bold text-center uppercase align-top"
-                            style={{ borderRight: "1px solid #000", backgroundColor: "#f8fafc" }}
-                          >
-                            APLICACIÓN
-                          </td>
-                          <td
-                            className="p-2 align-top text-justify"
-                            style={{ borderRight: "1px solid #000" }}
-                          >
-                            {clase.FASE_APLICACION}
-                          </td>
-                        </tr>
-
-                        {/* Fila 4: EVALUACIÓN */}
-                        <tr>
-                          <td
-                            className="p-2 font-bold text-center uppercase align-top"
-                            style={{ borderRight: "1px solid #000", backgroundColor: "#f8fafc" }}
-                          >
-                            EVALUACIÓN
-                          </td>
-                          <td
-                            className="p-2 align-top text-justify"
-                            style={{ borderRight: "1px solid #000" }}
-                          >
-                            {clase.FASE_EVALUACION}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Separador entre clases al imprimir todas */}
-                  {claseViewMode === "ALL" && idx < displayClases.length - 1 && (
-                    <div className="border-t-2 border-dashed border-slate-400 my-6 print:border-black print:my-8" />
-                  )}
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-12 text-slate-400">
-                No se encontraron Planes de Clase que coincidan con los filtros seleccionados.
+                ))}
               </div>
-            )}
+            </div>
+
+            {/* RECURSOS */}
+            <div className="p-2.5 border border-slate-800 rounded bg-slate-50 text-[11px]">
+              <span className="font-bold text-slate-900 block uppercase text-[10px]">
+                RECURSOS Y MATERIALES:
+              </span>
+              <input
+                type="text"
+                value={planTemplate.recursos}
+                onChange={(e) => updatePlanTemplate({ recursos: e.target.value })}
+                className="print:hidden w-full bg-transparent border-none focus:outline-none text-[11px] font-medium text-slate-800"
+              />
+              <p className="hidden print:block text-[11px] font-medium text-slate-800">
+                {planTemplate.recursos}
+              </p>
+            </div>
+
+            {/* FIRMA DOCENTE */}
+            <div className="pt-6">
+              <div className="max-w-xs mx-auto border-t border-slate-500 pt-1 text-center">
+                <p className="font-bold text-slate-800 text-xs">{planTemplate.docente}</p>
+                <p className="text-[10px] text-slate-500">DOCENTE DE ÁREA</p>
+              </div>
+            </div>
           </div>
         )}
       </div>

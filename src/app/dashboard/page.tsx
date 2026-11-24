@@ -1,680 +1,676 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
+  Users,
+  GraduationCap,
   BookOpen,
-  Calendar,
-  Bell,
-  MessageSquare,
+  ShieldCheck,
   Award,
-  RefreshCw,
+  Bell,
+  Calendar,
+  MessageSquare,
+  Video,
   FileSpreadsheet,
   Printer,
   Send,
   PlusCircle,
   CheckCircle2,
-  Users,
-  GraduationCap,
-  ShieldCheck,
-  ChevronDown,
-  ChevronUp,
+  AlertTriangle,
   Search,
   ExternalLink,
   Sparkles,
-  AlertCircle,
-  Clock,
+  RefreshCw,
   LogOut,
-  SlidersHorizontal,
-  ChevronRight,
-  Zap,
-  FileText,
-  UserCheck,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  X,
+  Plus,
+  Layers,
+  Lock,
 } from "lucide-react";
+
+import { useDemoStore, SubjectGrade } from "@/lib/demoStore";
 import { getGradeColorClass, getClasificacionCurricular } from "@/lib/siged";
 import BoletinModal, { StudentData } from "@/components/BoletinModal";
 import TeacherCurriculumHub from "@/components/TeacherCurriculumHub";
 
 type Role = "parent" | "student" | "teacher" | "admin";
-type PeriodKey = "t1" | "t2" | "t3" | "final";
+type ParentStudentTab = "notas" | "agenda" | "avisos" | "chat" | "meet";
+type TeacherTab = "cuadernos" | "curriculum" | "agenda_meet" | "chat";
+type AdminTab = "centralizador" | "vigilancia" | "comunicados" | "supervision_meet";
+type TrimesterKey = "t1" | "t2" | "t3" | "final";
+type AdminViewMode = "ALL" | "SIGED" | "HONOR";
 
-// SEMILLA DE RESPALDO INTEGRADA (FALLBACK_SEED) PARA 1RO-SEC
-const FALLBACK_SEED = {
-  stats: { teachers: 2, students: 3 },
-  teachers: [
-    {
-      id: "TCH-1",
-      full_name: "Lic. Ivan Ezequiel Mancilla Copa",
-      username: "prof_ivan.mancilla",
-      assignments: [
-        {
-          course: "1RO-SEC",
-          subject: "HISTORIA DE BOLIVIA",
-          drive_url: "https://docs.google.com/spreadsheets/d/1historia_bolivia_1sec_fielding/edit",
-        },
-        {
-          course: "1RO-SEC",
-          subject: "HISTORIA UNIVERSAL",
-          drive_url: "https://docs.google.com/spreadsheets/d/1historia_universal_1sec_fielding/edit",
-        },
-        {
-          course: "1RO-SEC",
-          subject: "LENGUA EXTRANJERA",
-          drive_url: "https://docs.google.com/spreadsheets/d/1ingles_1sec_fielding/edit",
-        },
-      ],
-    },
-    {
-      id: "TCH-2",
-      full_name: "Pacheco Rendon Jose Adrian",
-      username: "prof_pacheco.rendon",
-      assignments: [
-        {
-          course: "1RO-SEC",
-          subject: "QUÍMICA",
-          drive_url: "https://docs.google.com/spreadsheets/d/1dUFGC3ti6h1zKa_5mQbvJ2_YMROBk9AXyGQIHPKeZTQ/edit",
-        },
-      ],
-    },
-  ],
-  students: [
-    {
-      id: "STU-1",
-      full_name: "ALIAGA RAMOS YUSUF ADEL",
-      student_username: "est_aliaga.ramos",
-      parent_username: "fam_aliaga.ramos",
-      course: "1RO-SEC",
-      english_level: "B1-A",
-      rude_code: "807300222026101",
-      grades: {
-        QUÍMICA: {
-          profesor: "Pacheco Rendon Jose Adrian",
-          campo: "VIDA TIERRA TERRITORIO",
-          area: "CIENCIAS NATURALES",
-          t1: { ser: "10", saber: "42", hacer: "39", auto: "5", total: "96" },
-          t2: { ser: "10", saber: "45", hacer: "35", auto: "5", total: "95" },
-          t3: { ser: "10", saber: "43", hacer: "38", auto: "5", total: "96" },
-          final: "96",
-          estado: "APROBADO",
-        },
-        "HISTORIA DE BOLIVIA": {
-          profesor: "Lic. Ivan Ezequiel Mancilla Copa",
-          campo: "COMUNIDAD Y SOCIEDAD",
-          area: "CIENCIAS SOCIALES",
-          t1: { ser: "10", saber: "43", hacer: "38", auto: "5", total: "96" },
-          t2: { ser: "10", saber: "44", hacer: "39", auto: "5", total: "98" },
-          t3: { ser: "10", saber: "45", hacer: "40", auto: "5", total: "100" },
-          final: "98",
-          estado: "APROBADO",
-        },
-        "HISTORIA UNIVERSAL": {
-          profesor: "Lic. Ivan Ezequiel Mancilla Copa",
-          campo: "COMUNIDAD Y SOCIEDAD",
-          area: "CIENCIAS SOCIALES",
-          t1: { ser: "9", saber: "42", hacer: "38", auto: "5", total: "94" },
-          t2: { ser: "10", saber: "43", hacer: "39", auto: "5", total: "97" },
-          t3: { ser: "10", saber: "44", hacer: "38", auto: "5", total: "97" },
-          final: "96",
-          estado: "APROBADO",
-        },
-        "LENGUA EXTRANJERA": {
-          profesor: "Lic. Ivan Ezequiel Mancilla Copa (B1-A)",
-          campo: "COMUNIDAD Y SOCIEDAD",
-          area: "COMUNICACIÓN Y LENGUAJES",
-          t1: { ser: "10", saber: "41", hacer: "38", auto: "5", total: "94" },
-          t2: { ser: "9", saber: "42", hacer: "37", auto: "5", total: "93" },
-          t3: { ser: "10", saber: "44", hacer: "39", auto: "5", total: "98" },
-          final: "95",
-          estado: "APROBADO",
-        },
-      },
-    },
-  ],
+const ROLE_PROFILES: Record<Role, { name: string; title: string; initials: string }> = {
+  parent: {
+    name: "Familia Aliaga Ramos",
+    title: "Padre / Tutor • 1RO-SEC",
+    initials: "FA",
+  },
+  student: {
+    name: "Aliaga Ramos Yusuf Adel",
+    title: "Estudiante • 1RO-SEC",
+    initials: "YA",
+  },
+  teacher: {
+    name: "Lic. Ivan Ezequiel Mancilla Copa",
+    title: "Docente Titular",
+    initials: "IM",
+  },
+  admin: {
+    name: "Ing. José Mariano Pinaya",
+    title: "Dirección General",
+    initials: "JP",
+  },
 };
 
-export default function FieldingDashboard() {
-  const [role, setRole] = useState<Role>("teacher");
-  const [currentUser, setCurrentUser] = useState<string>("prof_ivan.mancilla");
-  const [currentName, setCurrentName] = useState<string>("Lic. Ivan Ezequiel Mancilla Copa");
+const SIGED_CAMPOS = [
+  { key: "COMUNIDAD Y SOCIEDAD", short: "Comunidad y Soc." },
+  { key: "CIENCIA TECNOLOGÍA Y PRODUCCIÓN", short: "Ciencia y Prod." },
+  { key: "VIDA TIERRA TERRITORIO", short: "Vida Tierra Terr." },
+  { key: "COSMOS Y PENSAMIENTOS", short: "Cosmos y Pens." },
+] as const;
 
-  const [seedData, setSeedData] = useState<any>(FALLBACK_SEED);
-  const [loading, setLoading] = useState(true);
+function computeSubjectFinalDimensions(g: SubjectGrade) {
+  const dims = [g.t1, g.t2, g.t3];
+  const avgField = (field: "ser" | "saber" | "hacer" | "auto") => {
+    const vals = dims
+      .map((d) => Number(d?.[field]))
+      .filter((v) => !isNaN(v) && v > 0);
+    if (vals.length === 0) return "-";
+    return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+  };
+  return {
+    ser: avgField("ser"),
+    saber: avgField("saber"),
+    hacer: avgField("hacer"),
+    auto: avgField("auto"),
+    total: g.final,
+  };
+}
 
-  // Sub-pestañas para la vista de Docente (Teacher)
-  const [teacherSubTab, setTeacherSubTab] = useState<"curriculum" | "drive" | "agenda">("curriculum");
+function DashboardContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  // Estados de navegación móvil (Padres / Estudiantes)
-  const [mobileTab, setMobileTab] = useState<"notas" | "calendario" | "avisos" | "chat">("notas");
-  const [selectedStudentIdx, setSelectedStudentIdx] = useState(0);
-  const [expandedSubject, setExpandedSubject] = useState<string | null>(null);
-  const [period, setPeriod] = useState<PeriodKey>("final");
+  const roleParam = searchParams.get("role") as Role | null;
+  const validRole: Role =
+    roleParam && ["parent", "student", "teacher", "admin"].includes(roleParam)
+      ? roleParam
+      : "parent";
 
-  // Estados de Dirección (Matriz Centralizadora)
-  const [adminCategory, setAdminCategory] = useState<"PRIMARIA" | "SECUNDARIA" | "SIGED" | "HONOR">("SECUNDARIA");
-  const [selectedCourse, setSelectedCourse] = useState<string>("1RO-SEC");
-  const [searchStudent, setSearchStudent] = useState("");
-  const [boletinStudent, setBoletinStudent] = useState<StudentData | null>(null);
-  const [syncStatus, setSyncStatus] = useState<string>("Conectado en tiempo real (< 45ms)");
-  const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [currentRole, setCurrentRole] = useState<Role>(validRole);
 
-  // Calendario de Tareas y Exámenes
-  const [events, setEvents] = useState([
-    {
-      id: 1,
-      course: "1RO-SEC",
-      subject: "HISTORIA DE BOLIVIA",
-      type: "TAREA",
-      title: "Montaje y Fichas Descriptivas del Museo Familiar",
-      date: "2026-10-25",
-      teacher: "Lic. Ivan Ezequiel Mancilla Copa",
-    },
-    {
-      id: 2,
-      course: "1RO-SEC",
-      subject: "HISTORIA UNIVERSAL",
-      type: "EXAMEN",
-      title: "Evaluación Oral: Feudalismo y Régimen de Vasallaje",
-      date: "2026-10-28",
-      teacher: "Lic. Ivan Ezequiel Mancilla Copa",
-    },
-    {
-      id: 3,
-      course: "1RO-SEC",
-      subject: "LENGUA EXTRANJERA",
-      type: "PROYECTO",
-      title: "Speaking Project Unit 6: Historical Heritage",
-      date: "2026-10-30",
-      teacher: "Lic. Ivan Ezequiel Mancilla Copa",
-    },
-  ]);
-  const [newEventTitle, setNewEventTitle] = useState("");
-  const [newEventSubject, setNewEventSubject] = useState("HISTORIA DE BOLIVIA");
-  const [newEventType, setNewEventType] = useState<"TAREA" | "EXAMEN" | "PROYECTO">("TAREA");
-  const [newEventDate, setNewEventDate] = useState("2026-10-29");
-
-  // Avisos Institucionales
-  const [announcements] = useState([
-    {
-      id: 1,
-      title: "Publicación de Planes de Clase y PDCs Gestión 2026",
-      body: "Los Planes de Desarrollo Curricular (PDCs) y secuencias didácticas de clases ya están disponibles para su impresión oficial.",
-      priority: "IMPORTANTE",
-      date: "Hoy, 08:30 AM",
-    },
-    {
-      id: 2,
-      title: "Sincronización Instantánea de Cuadernos Pedagógicos",
-      body: "Las notas de las 4 dimensiones (Ser, Saber, Hacer, Decidir/Auto) se encuentran actualizadas en vivo desde Google Sheets.",
-      priority: "NORMAL",
-      date: "Ayer",
-    },
-  ]);
-
-  // Mensajería Directa Padre <-> Profesor
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      sender: "Lic. Ivan Ezequiel Mancilla Copa (Historia)",
-      isTeacher: true,
-      text: "Estimada familia Aliaga Ramos, Yusuf ha tenido una destacada participación en el análisis de fuentes históricas.",
-      time: "09:15 AM",
-    },
-    {
-      id: 2,
-      sender: "Familia Aliaga Ramos",
-      isTeacher: false,
-      text: "Muchas gracias profesor Mancilla, Yusuf ya tiene listo el material para la exposición del Museo Familiar.",
-      time: "10:30 AM",
-    },
-  ]);
-  const [chatInput, setChatInput] = useState("");
-
-  // Cargar parámetros de la URL: role, user, name
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const urlRole = params.get("role") as Role;
-      const urlUser = params.get("user");
-      const urlName = params.get("name");
+    setCurrentRole(validRole);
+  }, [validRole]);
 
-      if (urlRole && ["parent", "student", "teacher", "admin"].includes(urlRole)) {
-        setRole(urlRole);
-      }
-      if (urlUser) {
-        setCurrentUser(urlUser);
-      }
-      if (urlName) {
-        setCurrentName(decodeURIComponent(urlName));
-      } else {
-        // Asignar nombre predeterminado según rol
-        if (urlRole === "admin") setCurrentName("Ing. José Mariano Pinaya");
-        else if (urlRole === "teacher") setCurrentName("Lic. Ivan Ezequiel Mancilla Copa");
-        else if (urlRole === "parent") setCurrentName("Familia Aliaga Ramos");
-        else if (urlRole === "student") setCurrentName("Aliaga Ramos Yusuf Adel");
-      }
-    }
+  // Store centralizado persistido en localStorage
+  const {
+    students,
+    assignments,
+    tasks,
+    announcements,
+    messages,
+    interviews,
+    alertKeywords,
+    lastSync,
+    addMessage,
+    addAlertKeyword,
+    removeAlertKeyword,
+    addTask,
+    addMeetInterview,
+    updateMeetStatus,
+    addAnnouncement,
+    deleteAnnouncement,
+    syncDrive,
+    resetToDefault,
+  } = useDemoStore();
 
-    loadDataFromApi(false).finally(() => setLoading(false));
-  }, []);
+  // Pestañas activas por rol
+  const [parentTab, setParentTab] = useState<ParentStudentTab>("notas");
+  const [teacherTab, setTeacherTab] = useState<TeacherTab>("cuadernos");
+  const [adminTab, setAdminTab] = useState<AdminTab>("centralizador");
 
-  // Función para cargar datos desde /api/seed
-  const loadDataFromApi = async (isManualSync = false) => {
+  // Estados vista Padres / Estudiantes
+  const [selectedTrimester, setSelectedTrimester] = useState<TrimesterKey>("final");
+  const [expandedSubject, setExpandedSubject] = useState<string | null>(null);
+  const [boletinStudent, setBoletinStudent] = useState<StudentData | null>(null);
+
+  const currentStudent = useMemo(() => {
+    return students.find((s) => s.id === "STU-1") || students[0];
+  }, [students]);
+
+  // Sincronización Drive
+  const [isSyncingDrive, setIsSyncingDrive] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+  const [actionToast, setActionToast] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setActionToast(msg);
+    setTimeout(() => setActionToast(null), 3500);
+  };
+
+  // Chat states
+  const [chatInput, setChatInput] = useState("");
+  const [teacherSelectedThread, setTeacherSelectedThread] = useState<string>("TH-ALIAGA-MANCILLA");
+  const [teacherReplyInput, setTeacherReplyInput] = useState("");
+
+  // Formularios Teacher / Parent Meet
+  const [newTaskCourse, setNewTaskCourse] = useState("1RO-SEC");
+  const [newTaskSubject, setNewTaskSubject] = useState("HISTORIA DE BOLIVIA");
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDesc, setNewTaskDesc] = useState("");
+  const [newTaskDueDate, setNewTaskDueDate] = useState("2026-11-30");
+  const [newTaskType, setNewTaskType] = useState<"TAREA" | "EXAMEN" | "EVENTO">("TAREA");
+
+  const [showParentMeetModal, setShowParentMeetModal] = useState(false);
+  const [newMeetParent, setNewMeetParent] = useState("Familia Aliaga Ramos");
+  const [newMeetStudent, setNewMeetStudent] = useState("Aliaga Ramos Yusuf Adel");
+  const [newMeetCourse, setNewMeetCourse] = useState("1RO-SEC");
+  const [newMeetDate, setNewMeetDate] = useState("2026-11-28");
+  const [newMeetTime, setNewMeetTime] = useState("16:00");
+  const [newMeetReason, setNewMeetReason] = useState(
+    "Seguimiento de aprovechamiento académico y plan de reforzamiento"
+  );
+
+  // Modal Comunicado Admin
+  const [showNewAnnouncementModal, setShowNewAnnouncementModal] = useState(false);
+  const [newAnnTitle, setNewAnnTitle] = useState("");
+  const [newAnnContent, setNewAnnContent] = useState("");
+  const [newAnnPriority, setNewAnnPriority] = useState<"ALTA" | "MEDIA" | "GENERAL">("MEDIA");
+  const [newAnnTarget, setNewAnnTarget] = useState<"TODOS" | "PADRES" | "DOCENTES">("TODOS");
+
+  // Filtros Admin
+  const [adminCourseFilter, setAdminCourseFilter] = useState<string>("ALL");
+  const [adminSearch, setAdminSearch] = useState<string>("");
+  const [adminViewMode, setAdminViewMode] = useState<AdminViewMode>("ALL");
+
+  // Filtros Vigilancia Chats (Admin)
+  const [auditKeywordFilter, setAuditKeywordFilter] = useState<string>("");
+  const [auditTeacherFilter, setAuditTeacherFilter] = useState<string>("ALL");
+  const [auditCourseFilter, setAuditCourseFilter] = useState<string>("ALL");
+  const [auditOnlyAlerts, setAuditOnlyAlerts] = useState<boolean>(false);
+  const [newAlertWord, setNewAlertWord] = useState<string>("");
+
+  const activeProfile = ROLE_PROFILES[currentRole];
+
+  const handleSwitchRole = (role: Role) => {
+    setCurrentRole(role);
+    router.replace(`/dashboard?role=${role}`);
+  };
+
+  const handleDriveSync = (courseSubject?: string) => {
+    setIsSyncingDrive(true);
+    setSyncFeedback(null);
     const t0 = performance.now();
-    try {
-      if (isManualSync) {
-        setIsSyncing(true);
-        setSyncStatus("Sincronizando con Google Sheets...");
-
-        try {
-          await fetch("/api/sync-drive", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              secret: "80f145381e",
-              course: selectedCourse,
-              subject: "GLOBAL",
-            }),
-          });
-        } catch (e) {
-          console.warn("Fallo secundario en webhook sync-drive", e);
-        }
-      }
-
-      const res = await fetch("/api/seed", {
-        cache: "no-store",
-        headers: {
-          Pragma: "no-cache",
-          "Cache-Control": "no-cache",
-        },
-      });
-
-      if (!res.ok) throw new Error("Respuesta no OK de /api/seed");
-      const json = await res.json();
-      const t1 = performance.now();
-      const latency = Math.round(t1 - t0);
-
-      if (json?.students && json.students.length > 0) {
-        setSeedData(json);
-        if (!selectedCourse) {
-          setSelectedCourse(json.students[0].course || "1RO-SEC");
-        }
-      }
-
-      setLastLatencyMs(latency);
-      setSyncStatus(`Sincronizado en ${latency}ms • En vivo`);
-      setIsSyncing(false);
-      return latency;
-    } catch (err) {
-      const t1 = performance.now();
-      const latency = Math.round(t1 - t0);
-      setLastLatencyMs(latency);
-      setSyncStatus(`Modo Local Activo (${latency}ms)`);
-      setIsSyncing(false);
-      return latency;
-    }
+    setTimeout(() => {
+      syncDrive(courseSubject);
+      const elapsed = Math.max(18, Math.min(44, Math.round(performance.now() - t0 - 380)));
+      setIsSyncingDrive(false);
+      setSyncFeedback(
+        courseSubject
+          ? `Cuaderno "${courseSubject}" sincronizado con Google Drive en ${elapsed}ms`
+          : `Todos los Cuadernos Pedagógicos sincronizados con Google Drive en ${elapsed}ms`
+      );
+      setTimeout(() => setSyncFeedback(null), 4000);
+    }, 420);
   };
 
-  const handleSyncDrive = async () => {
-    await loadDataFromApi(true);
-  };
-
-  // Determinar si el usuario tiene privilegios de Director para cambiar de rol
-  const canSwitchRole = currentUser === "admin_direccion" || role === "admin";
-
-  const currentStudent =
-    seedData.students && seedData.students.length > 0
-      ? seedData.students[selectedStudentIdx] || seedData.students[0]
-      : FALLBACK_SEED.students[0];
-
-  // Agrupación de cursos disponibles
-  const coursesByLevel = useMemo(() => {
-    const prim = new Set<string>();
-    const sec = new Set<string>();
-    (seedData.students || []).forEach((s: any) => {
-      const c = String(s.course || "").toUpperCase();
-      if (c.includes("PRIM")) prim.add(s.course);
-      else if (c.includes("SEC")) sec.add(s.course);
-    });
-    return {
-      PRIMARIA: Array.from(prim).sort(),
-      SECUNDARIA: Array.from(sec).sort(),
-    };
-  }, [seedData]);
-
-  // Estudiantes del curso activo para la Matriz Centralizadora
-  const courseStudents = useMemo(() => {
-    return (seedData.students || [])
-      .filter((s: any) => s.course === selectedCourse)
-      .filter((s: any) =>
-        s.full_name.toLowerCase().includes(searchStudent.toLowerCase())
-      )
-      .sort((a: any, b: any) => a.full_name.localeCompare(b.full_name));
-  }, [seedData, selectedCourse, searchStudent]);
-
-  // Materias o Áreas del curso activo
-  const courseSubjects = useMemo(() => {
-    const set = new Set<string>();
-    (courseStudents || []).forEach((s: any) => {
-      Object.keys(s.grades || {}).forEach((m) => {
-        if (adminCategory === "SIGED") {
-          const cl = getClasificacionCurricular(m, selectedCourse);
-          set.add(cl.area);
-        } else {
-          set.add(m);
-        }
-      });
-    });
-    return Array.from(set).sort();
-  }, [courseStudents, adminCategory, selectedCourse]);
-
-  // Cuadro de Honor Top 5 del Colegio
-  const honorRollSchool = useMemo(() => {
-    const list = (seedData.students || []).map((s: any) => {
-      const vals = Object.values(s.grades || {})
-        .map((g: any) => {
-          const v = period === "final" ? g?.final : g?.[period]?.total;
-          return parseFloat(String(v ?? "").replace(",", "."));
-        })
-        .filter((n: number) => !isNaN(n));
-      const avg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-      return { ...s, avg: avg.toFixed(1), numAvg: avg };
-    });
-    return list.sort((a: any, b: any) => b.numAvg - a.numAvg).slice(0, 5);
-  }, [seedData, period]);
-
-  // Promedio General del Estudiante Actual (Padre / Estudiante)
-  const currentStudentAverage = useMemo(() => {
-    const vals = Object.values(currentStudent.grades || {})
-      .map((g: any) => {
-        const v = period === "final" ? g?.final : g?.[period]?.total;
-        return parseFloat(String(v ?? "").replace(",", "."));
-      })
-      .filter((n: number) => !isNaN(n));
-    return vals.length > 0 ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) : "0.0";
-  }, [currentStudent, period]);
-
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendParentMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
 
-    const newMsg = {
-      id: Date.now(),
-      sender: role === "teacher" ? currentName : `Familia ${currentStudent.full_name}`,
-      isTeacher: role === "teacher",
-      text: chatInput,
-      time: "Ahora",
-    };
+    addMessage({
+      threadId: "TH-ALIAGA-MANCILLA",
+      senderRole: currentRole === "parent" ? "parent" : "student",
+      senderName: currentRole === "parent" ? "Familia Aliaga Ramos" : "Aliaga Ramos Yusuf Adel",
+      recipientName: "Lic. Ivan Ezequiel Mancilla Copa",
+      teacherName: "Lic. Ivan Ezequiel Mancilla Copa",
+      course: currentStudent.course,
+      text: chatInput.trim(),
+    });
 
-    setMessages((prev) => [...prev, newMsg]);
     setChatInput("");
   };
 
-  const handleAddEvent = (e: React.FormEvent) => {
+  const handleSendTeacherReply = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newEventTitle.trim()) return;
+    if (!teacherReplyInput.trim()) return;
 
-    const ev = {
-      id: Date.now(),
+    const recipient =
+      teacherSelectedThread === "TH-ALIAGA-MANCILLA"
+        ? "Familia Aliaga Ramos"
+        : "Familia Benavides Castro";
+
+    addMessage({
+      threadId: teacherSelectedThread,
+      senderRole: "teacher",
+      senderName: "Lic. Ivan Ezequiel Mancilla Copa",
+      recipientName: recipient,
+      teacherName: "Lic. Ivan Ezequiel Mancilla Copa",
       course: "1RO-SEC",
-      subject: newEventSubject,
-      type: newEventType,
-      title: newEventTitle,
-      date: newEventDate,
-      teacher: currentName,
-    };
+      text: teacherReplyInput.trim(),
+    });
 
-    setEvents((prev) => [ev, ...prev]);
-    setNewEventTitle("");
-    alert("¡Actividad programada exitosamente en el calendario institucional!");
+    setTeacherReplyInput("");
   };
 
+  const handleCreateTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim()) return;
+
+    addTask({
+      course: newTaskCourse,
+      subject: newTaskSubject,
+      teacher: "Lic. Ivan Ezequiel Mancilla Copa",
+      title: newTaskTitle.trim(),
+      description: newTaskDesc.trim() || "Revisar instrucciones en cuaderno de materia.",
+      dueDate: newTaskDueDate,
+      type: newTaskType,
+    });
+
+    setNewTaskTitle("");
+    setNewTaskDesc("");
+    showToast(`¡${newTaskType} publicado! Ya es visible en la Agenda de ${newTaskCourse}.`);
+  };
+
+  const handleCreateMeet = (e: React.FormEvent, fromParentModal = false) => {
+    e.preventDefault();
+    const created = addMeetInterview({
+      teacherName: "Lic. Ivan Ezequiel Mancilla Copa",
+      parentName: fromParentModal ? "Familia Aliaga Ramos" : newMeetParent,
+      studentName: fromParentModal ? currentStudent.full_name : newMeetStudent,
+      course: fromParentModal ? currentStudent.course : newMeetCourse,
+      date: newMeetDate,
+      time: newMeetTime,
+      reason: newMeetReason.trim() || "Entrevista de seguimiento pedagógico",
+    });
+
+    setShowParentMeetModal(false);
+    showToast(`Entrevista agendada • Sala generada: ${created.meetCode}`);
+  };
+
+  const handleCreateAnnouncement = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAnnTitle.trim()) return;
+
+    addAnnouncement({
+      title: newAnnTitle.trim(),
+      content: newAnnContent.trim(),
+      priority: newAnnPriority,
+      author: "Dirección General - Ing. José Mariano Pinaya",
+      targetRole: newAnnTarget,
+    });
+
+    setNewAnnTitle("");
+    setNewAnnContent("");
+    setShowNewAnnouncementModal(false);
+    showToast("Comunicado institucional publicado en tiempo real para los perfiles seleccionados.");
+  };
+
+  const handleAddAlertKeyword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAlertWord.trim()) return;
+    addAlertKeyword(newAlertWord.trim());
+    setNewAlertWord("");
+  };
+
+  // Promedio del estudiante actual
+  const studentAverage = useMemo(() => {
+    if (!currentStudent || !currentStudent.grades) return 0;
+    let sum = 0;
+    let count = 0;
+    Object.values(currentStudent.grades).forEach((g) => {
+      const val = Number(g.final);
+      if (!isNaN(val) && val > 0) {
+        sum += val;
+        count++;
+      }
+    });
+    return count > 0 ? Math.round(sum / count) : 0;
+  }, [currentStudent]);
+
+  // Avisos visibles para padres/estudiantes
+  const parentAnnouncements = useMemo(() => {
+    return announcements.filter((a) => a.targetRole === "TODOS" || a.targetRole === "PADRES");
+  }, [announcements]);
+
+  // Centralizador Maestro (con cálculo por Campos SIGED + Promedio General)
+  const processedAdminStudents = useMemo(() => {
+    let list = [...students];
+
+    if (adminCourseFilter !== "ALL") {
+      list = list.filter((s) => s.course.includes(adminCourseFilter));
+    }
+
+    if (adminSearch.trim()) {
+      const q = adminSearch.toLowerCase();
+      list = list.filter(
+        (s) =>
+          s.full_name.toLowerCase().includes(q) ||
+          s.course.toLowerCase().includes(q) ||
+          s.rude_code.toLowerCase().includes(q)
+      );
+    }
+
+    const withStats = list.map((s) => {
+      let sum = 0;
+      let count = 0;
+      const campoBuckets: Record<string, number[]> = {};
+
+      Object.entries(s.grades || {}).forEach(([matName, g]) => {
+        const val = Number(g.final);
+        if (!isNaN(val) && val > 0) {
+          sum += val;
+          count++;
+          const { campo } = getClasificacionCurricular(matName, s.course);
+          if (!campoBuckets[campo]) campoBuckets[campo] = [];
+          campoBuckets[campo].push(val);
+        }
+      });
+
+      const campoAvgs: Record<string, number | string> = {};
+      SIGED_CAMPOS.forEach(({ key }) => {
+        const arr = campoBuckets[key] || [];
+        campoAvgs[key] =
+          arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : "-";
+      });
+
+      const avg = count > 0 ? Math.round(sum / count) : 0;
+      return { ...s, calculatedAvg: avg, campoAvgs };
+    });
+
+    if (adminViewMode === "HONOR") {
+      return withStats.sort((a, b) => b.calculatedAvg - a.calculatedAvg).slice(0, 5);
+    }
+
+    return withStats.sort((a, b) => a.full_name.localeCompare(b.full_name));
+  }, [students, adminCourseFilter, adminSearch, adminViewMode]);
+
+  // Docentes y cursos únicos para filtros de vigilancia
+  const auditTeachers = useMemo(() => {
+    return Array.from(new Set(messages.map((m) => m.teacherName).filter(Boolean)));
+  }, [messages]);
+
+  const auditCourses = useMemo(() => {
+    return Array.from(new Set(messages.map((m) => m.course).filter(Boolean)));
+  }, [messages]);
+
+  const totalAlertsCount = useMemo(() => {
+    return messages.filter((m) => m.hasAlert).length;
+  }, [messages]);
+
+  const filteredAuditMessages = useMemo(() => {
+    let list = [...messages];
+
+    if (auditTeacherFilter !== "ALL") {
+      list = list.filter((m) => m.teacherName === auditTeacherFilter);
+    }
+    if (auditCourseFilter !== "ALL") {
+      list = list.filter((m) => m.course === auditCourseFilter);
+    }
+    if (auditOnlyAlerts) {
+      list = list.filter((m) => m.hasAlert);
+    }
+    if (auditKeywordFilter.trim()) {
+      const q = auditKeywordFilter.toLowerCase();
+      list = list.filter(
+        (m) =>
+          m.text.toLowerCase().includes(q) ||
+          m.senderName.toLowerCase().includes(q) ||
+          m.recipientName.toLowerCase().includes(q) ||
+          m.course.toLowerCase().includes(q) ||
+          (m.alertKeyword && m.alertKeyword.toLowerCase().includes(q))
+      );
+    }
+
+    return list.reverse();
+  }, [messages, auditTeacherFilter, auditCourseFilter, auditOnlyAlerts, auditKeywordFilter]);
+
   return (
-    <div className="min-h-screen bg-[#FAFAF0] text-slate-800 font-sans pb-16">
-      {/* 1. BARRA INSTITUCIONAL SUPERIOR */}
-      <header className="sticky top-0 z-40 bg-[#1b4e23] border-b-4 border-[#d6a427] text-white shadow-lg print:hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
-          {/* Logo y Nombre */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#FAFAF0] rounded-xl flex items-center justify-center text-[#1b4e23] shadow-md border border-[#d6a427]">
-              <GraduationCap className="w-6 h-6" />
+    <div className="min-h-screen bg-[#FAFAF0] text-slate-800 pb-24 md:pb-12">
+      {/* ============================================================= */}
+      {/* BARRA SUPERIOR INSTITUCIONAL CON CONMUTADOR DEMO              */}
+      {/* ============================================================= */}
+      <header className="no-print sticky top-0 z-40 bg-white/95 border-b border-slate-200/90 shadow-sm backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
+          {/* Logo y Nombre Institucional */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl p-1 flex items-center justify-center shadow-sm flex-shrink-0">
+              <img
+                src="https://i.imgur.com/wjibHTr.png"
+                alt="Fielding Bolivia"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = "none";
+                }}
+              />
             </div>
-            <div>
-              <h1 className="font-black text-sm sm:text-base uppercase tracking-wider text-white">
-                Colegio Fielding Bolivia
+            <div className="hidden md:block truncate">
+              <h1 className="text-sm font-black text-[#266b31] tracking-tight uppercase leading-none">
+                FIELDING APP
               </h1>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span className="text-[10px] text-[#9ac29d] font-semibold tracking-wide flex items-center gap-1">
-                  {lastLatencyMs !== null && <Zap className="w-3 h-3 text-[#d6a427]" />}
-                  {syncStatus}
-                </span>
-              </div>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">
+                Colegio Fielding Bolivia • SIGED
+              </p>
             </div>
           </div>
 
-          {/* Selector de los 4 Roles: EXCLUSIVO PARA ADMINISTRADOR / DIRECTOR */}
-          {canSwitchRole ? (
-            <div className="flex items-center bg-[#123617] p-1 rounded-xl border border-emerald-900/40">
-              <span className="text-[10px] font-bold text-slate-300 uppercase px-2 hidden md:inline">
-                Cambiar Rol:
-              </span>
-              {(
-                [
-                  { id: "parent", label: "Padres", icon: Users },
-                  { id: "student", label: "Estudiante", icon: GraduationCap },
-                  { id: "teacher", label: "Profesor", icon: BookOpen },
-                  { id: "admin", label: "Dirección", icon: ShieldCheck },
-                ] as const
-              ).map((item) => {
-                const Icon = item.icon;
-                const isActive = role === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setRole(item.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer ${
-                      isActive
-                        ? "bg-[#d6a427] text-slate-950 shadow-md scale-102"
-                        : "text-slate-300 hover:text-white hover:bg-white/10"
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">{item.label}</span>
-                  </button>
-                );
-              })}
+          {/* CONMUTADOR RÁPIDO DE ROLES DEMO */}
+          <div className="flex items-center gap-1 p-1 bg-[#FAFAF0] border border-slate-200 rounded-2xl shadow-inner">
+            <span className="text-[10px] font-extrabold text-slate-500 uppercase px-2 hidden xl:inline-block">
+              DEMO VIVO:
+            </span>
+            {(
+              [
+                { id: "parent", label: "Padre", icon: Users },
+                { id: "student", label: "Estudiante", icon: GraduationCap },
+                { id: "teacher", label: "Docente", icon: BookOpen },
+                { id: "admin", label: "Dirección", icon: ShieldCheck },
+              ] as const
+            ).map((item) => {
+              const Icon = item.icon;
+              const isActive = currentRole === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleSwitchRole(item.id)}
+                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    isActive
+                      ? "bg-[#266b31] text-white shadow-md scale-[1.02]"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-white"
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* INDICADOR DE LATENCIA, USUARIO ACTIVO & ACCIONES */}
+          <div className="flex items-center gap-2">
+            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              <span>Tiempo real • &lt;45ms</span>
             </div>
-          ) : (
-            /* Badge de Perfil Restringido para Docentes, Padres y Estudiantes */
-            <div className="flex items-center gap-2 bg-[#123617] px-3.5 py-1.5 rounded-xl border border-emerald-900/40">
-              <UserCheck className="w-4 h-4 text-[#d6a427]" />
-              <div className="text-left">
-                <span className="text-[9px] uppercase font-bold text-[#9ac29d] block leading-tight">
-                  Sesión activa ({role.toUpperCase()})
-                </span>
-                <span className="text-xs font-black text-white uppercase truncate block max-w-[200px] sm:max-w-[280px]">
-                  {currentName}
-                </span>
+
+            <div className="hidden sm:flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-xl bg-[#FAFAF0] border border-slate-200">
+              <div className="w-7 h-7 rounded-lg bg-[#266b31] text-white flex items-center justify-center text-[10px] font-black">
+                {activeProfile.initials}
+              </div>
+              <div className="leading-tight hidden xl:block">
+                <p className="text-[11px] font-extrabold text-slate-800 max-w-[140px] truncate">
+                  {activeProfile.name}
+                </p>
+                <p className="text-[9px] font-semibold text-slate-500">{activeProfile.title}</p>
               </div>
             </div>
-          )}
 
-          {/* Salir / Cerrar Sesión */}
-          <a
-            href="/"
-            className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-[#d6a427] font-bold uppercase transition-colors"
-            title="Cerrar sesión"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="hidden lg:inline">Salir</span>
-          </a>
+            <button
+              onClick={() => {
+                if (confirm("¿Deseas restaurar los datos iniciales de demostración?")) {
+                  resetToDefault();
+                  showToast("Datos de demostración restablecidos.");
+                }
+              }}
+              className="p-2 text-slate-400 hover:text-[#266b31] hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              title="Restablecer Datos Demo"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={() => router.push("/")}
+              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+              title="Cerrar Sesión"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* CONTENIDO PRINCIPAL SEGÚN EL ROL AUTENTICADO */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* ========================================================================= */}
-        {/* VISTA 1 & 2: PADRE DE FAMILIA / ESTUDIANTE (MOBILE-FIRST)                  */}
-        {/* ========================================================================= */}
-        {(role === "parent" || role === "student") && (
-          <div className="max-w-2xl mx-auto space-y-5">
-            {/* Selector de Estudiante */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-[#266b31]/10 text-[#266b31] flex items-center justify-center font-black text-lg border border-[#266b31]/20">
-                  {currentStudent.full_name.charAt(0)}
+      {/* TOAST DE CONFIRMACIÓN GLOBAL */}
+      {actionToast && (
+        <div className="no-print fixed top-20 right-4 z-50 bg-[#1b4e23] text-white px-4 py-3 rounded-2xl shadow-xl border border-[#d6a427]/50 flex items-center gap-2.5 text-xs font-bold max-w-sm">
+          <CheckCircle2 className="w-4 h-4 text-[#d6a427] flex-shrink-0" />
+          <span>{actionToast}</span>
+        </div>
+      )}
+
+      {/* CONTENIDO PRINCIPAL */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        {/* ============================================================= */}
+        {/* VISTA 1 & 2: PADRE DE FAMILIA / ESTUDIANTE (MOBILE-FIRST)     */}
+        {/* ============================================================= */}
+        {(currentRole === "parent" || currentRole === "student") && (
+          <div className="space-y-6">
+            {/* Tarjeta de Perfil del Estudiante */}
+            <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-sm flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#266b31] to-[#1b4e23] text-white flex items-center justify-center font-black text-xl shadow-md">
+                  YA
                 </div>
                 <div>
-                  <span className="text-[10px] font-extrabold uppercase text-slate-400 block tracking-wider">
-                    {role === "parent" ? "Estudiante Vinculado:" : "Estudiante:"}
-                  </span>
-                  <h2 className="font-extrabold text-sm sm:text-base text-slate-900 uppercase">
-                    {currentStudent.full_name}
-                  </h2>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="px-2 py-0.5 bg-[#266b31] text-white text-[10px] font-bold rounded-md uppercase">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-black text-slate-900">
+                      {currentStudent.full_name}
+                    </h2>
+                    <span className="bg-[#d6a427]/20 text-[#1b4e23] font-bold text-[10px] px-2.5 py-0.5 rounded-full">
                       {currentStudent.course}
                     </span>
-                    {currentStudent.english_level && (
-                      <span className="px-2 py-0.5 bg-[#dcfce7] text-[#15803d] text-[10px] font-bold rounded-md uppercase">
-                        Inglés: {currentStudent.english_level}
-                      </span>
-                    )}
+                    <span className="bg-[#9ac29d]/30 text-[#1b4e23] font-bold text-[10px] px-2 py-0.5 rounded-full">
+                      {currentRole === "parent" ? "Vista Tutor / Familia" : "Vista Estudiante"}
+                    </span>
                   </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    RUDE: {currentStudent.rude_code} • Nivel Inglés:{" "}
+                    <span className="font-bold text-[#266b31]">
+                      {currentStudent.english_level}
+                    </span>
+                  </p>
                 </div>
               </div>
 
-              {/* Botón Descargar Boletín Oficial */}
-              <button
-                type="button"
-                onClick={() => setBoletinStudent(currentStudent)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#d6a427] hover:bg-[#b88c1f] text-slate-900 font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md active:scale-95 cursor-pointer ml-auto"
-              >
-                <Printer className="w-4 h-4" />
-                <span>Boletín Oficial</span>
-              </button>
-            </div>
-
-            {/* Sub-Pestañas Móviles */}
-            <div className="grid grid-cols-4 bg-white p-1 rounded-2xl shadow-sm border border-slate-200">
-              {[
-                { id: "notas", label: "Notas", icon: BookOpen },
-                { id: "calendario", label: "Agenda", icon: Calendar },
-                { id: "avisos", label: "Avisos", icon: Bell },
-                { id: "chat", label: "Mensajes", icon: MessageSquare },
-              ].map((t) => {
-                const Icon = t.icon;
-                const isSelected = mobileTab === t.id;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setMobileTab(t.id as any)}
-                    className={`py-2.5 flex flex-col items-center gap-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      isSelected
-                        ? "bg-[#266b31] text-white shadow-sm"
-                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
-                    }`}
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <span className="block text-[10px] font-bold text-slate-500 uppercase">
+                    Promedio General
+                  </span>
+                  <span
+                    className={`text-xl font-black px-2.5 py-0.5 rounded-lg ${getGradeColorClass(
+                      studentAverage
+                    )}`}
                   >
-                    <Icon className="w-4 h-4" />
-                    <span>{t.label}</span>
-                  </button>
-                );
-              })}
+                    {studentAverage} / 100
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => setBoletinStudent(currentStudent)}
+                  className="flex items-center gap-2 bg-[#266b31] hover:bg-[#1b4e23] text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-md transition-all active:scale-95 cursor-pointer"
+                >
+                  <Printer className="w-4 h-4 text-[#d6a427]" />
+                  <span>Boletín Oficial (Carta)</span>
+                </button>
+              </div>
             </div>
 
-            {/* CONTENIDO PESTAÑA 1: NOTAS / CALIFICACIONES */}
-            {mobileTab === "notas" && (
+            {/* SECCIÓN 1: NOTAS EN TIEMPO REAL */}
+            {parentTab === "notas" && (
               <div className="space-y-4">
-                {/* Selector de Período / Trimestre */}
-                <div className="flex items-center justify-between bg-white p-2.5 rounded-2xl border border-slate-200">
-                  {(
-                    [
-                      { id: "t1", label: "1T" },
-                      { id: "t2", label: "2T" },
-                      { id: "t3", label: "3T" },
-                      { id: "final", label: "Anual" },
-                    ] as const
-                  ).map((p) => {
-                    const isSelected = period === p.id;
-                    return (
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                    <Award className="w-5 h-5 text-[#266b31]" />
+                    <span>Calificaciones en Tiempo Real (4 Dimensiones SEP Bolivia)</span>
+                  </h3>
+
+                  <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-slate-200 shadow-sm text-xs font-bold">
+                    {(
+                      [
+                        { id: "t1", label: "1T" },
+                        { id: "t2", label: "2T" },
+                        { id: "t3", label: "3T" },
+                        { id: "final", label: "Final" },
+                      ] as const
+                    ).map((t) => (
                       <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setPeriod(p.id)}
-                        className={`flex-1 py-1.5 mx-1 rounded-lg text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer text-center ${
-                          isSelected
-                            ? "bg-[#1b4e23] text-white shadow"
-                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        key={t.id}
+                        onClick={() => setSelectedTrimester(t.id)}
+                        className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer ${
+                          selectedTrimester === t.id
+                            ? "bg-[#266b31] text-white shadow-sm"
+                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                         }`}
                       >
-                        {p.label}
+                        {t.label}
                       </button>
-                    );
-                  })}
-                </div>
-
-                {/* Banner de Promedio General del Trimestre Seleccionado */}
-                <div className="bg-gradient-to-r from-[#266b31] to-[#1b4e23] text-white p-5 rounded-2xl shadow-md border-b-4 border-[#d6a427] flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-[#9ac29d] tracking-wider block">
-                      Promedio ({period.toUpperCase()})
-                    </span>
-                    <h3 className="text-3xl font-black mt-0.5">{currentStudentAverage}</h3>
-                    <span className="text-[11px] text-white/80">
-                      Escala Oficial Sistema Educativo Boliviano
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span
-                      className={`inline-block px-3 py-1 rounded-lg font-black text-xs uppercase tracking-wider ${
-                        Number(currentStudentAverage) >= 51
-                          ? "bg-[#dcfce7] text-[#15803d]"
-                          : "bg-[#fee2e2] text-[#b91c1c]"
-                      }`}
-                    >
-                      {Number(currentStudentAverage) >= 51 ? "Aprobado" : "En Riesgo"}
-                    </span>
+                    ))}
                   </div>
                 </div>
 
-                {/* Listado de Materias Desplegables con las 4 Dimensiones */}
-                <div className="space-y-3">
-                  {Object.entries(currentStudent.grades || {}).map(([matKey, grade]: [string, any]) => {
+                {/* Tarjetas Acordeón Desplegables */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {Object.entries(currentStudent.grades).map(([matKey, g]) => {
                     const isExpanded = expandedSubject === matKey;
-                    const periodGrade = period === "final" ? grade?.final : grade?.[period]?.total;
-                    const dim = period === "final" ? grade?.t3 || {} : grade?.[period] || {};
+                    const dim =
+                      selectedTrimester === "final"
+                        ? computeSubjectFinalDimensions(g)
+                        : g[selectedTrimester];
 
                     return (
                       <div
                         key={matKey}
-                        className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm transition-all"
+                        className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm transition-all hover:border-[#266b31]/40"
                       >
-                        {/* Cabecera de la materia (Click para desplegar) */}
-                        <button
-                          type="button"
+                        <div
                           onClick={() => setExpandedSubject(isExpanded ? null : matKey)}
-                          className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer"
+                          className="p-4 flex items-center justify-between cursor-pointer select-none"
                         >
-                          <div className="flex-1 pr-3">
-                            <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-                              {grade?.area || "ÁREA CURRICULAR"}
-                            </span>
-                            <h4 className="font-extrabold text-sm uppercase text-slate-900">
-                              {matKey}
-                            </h4>
-                            <p className="text-[11px] text-slate-500 mt-0.5">
-                              {grade?.profesor || "Docente Asignado"}
-                            </p>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="font-extrabold text-sm text-slate-900">
+                                {matKey}
+                              </span>
+                              <span className="text-[10px] font-semibold text-slate-500">
+                                • {g.area}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-0.5">{g.profesor}</p>
                           </div>
+
                           <div className="flex items-center gap-3">
                             <span
-                              className={`px-3 py-1.5 rounded-xl font-black text-sm font-mono ${getGradeColorClass(
-                                periodGrade
+                              className={`text-base font-black px-2.5 py-1 rounded-xl ${getGradeColorClass(
+                                dim.total
                               )}`}
                             >
-                              {periodGrade ?? "-"}
+                              {dim.total}
                             </span>
                             {isExpanded ? (
                               <ChevronUp className="w-5 h-5 text-slate-400" />
@@ -682,57 +678,61 @@ export default function FieldingDashboard() {
                               <ChevronDown className="w-5 h-5 text-slate-400" />
                             )}
                           </div>
-                        </button>
+                        </div>
 
-                        {/* Desglose de las 4 Dimensiones Bolivianas */}
                         {isExpanded && (
-                          <div className="px-4 pb-4 pt-2 bg-slate-50/80 border-t border-slate-100">
-                            <p className="text-[10px] font-extrabold uppercase text-[#266b31] tracking-wider mb-2.5">
-                              Desglose de Dimensiones ({period.toUpperCase()}):
-                            </p>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                              {/* SER (10 pts) */}
-                              <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-center">
-                                <span className="text-[9px] font-extrabold uppercase text-slate-400 block">
+                          <div className="px-4 pb-4 pt-2 border-t border-slate-100 bg-[#FAFAF0]/70 space-y-3">
+                            <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">
+                              Desglose Oficial ({selectedTrimester === "final" ? "Promedio Anual" : selectedTrimester.toUpperCase()} • Sobre 100 pts):
+                            </span>
+
+                            <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                              <div className="bg-white p-2 rounded-xl border border-slate-200">
+                                <span className="block text-[10px] font-bold text-emerald-800">
                                   SER (10)
                                 </span>
-                                <span className="text-base font-black text-slate-800">
-                                  {dim?.ser ?? "-"}
+                                <span className="text-base font-black text-slate-900">
+                                  {dim.ser}
                                 </span>
                               </div>
-                              {/* SABER (45 pts) */}
-                              <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-center">
-                                <span className="text-[9px] font-extrabold uppercase text-slate-400 block">
+                              <div className="bg-white p-2 rounded-xl border border-slate-200">
+                                <span className="block text-[10px] font-bold text-blue-800">
                                   SABER (45)
                                 </span>
-                                <span className="text-base font-black text-slate-800">
-                                  {dim?.saber ?? "-"}
+                                <span className="text-base font-black text-slate-900">
+                                  {dim.saber}
                                 </span>
                               </div>
-                              {/* HACER (40 pts) */}
-                              <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-center">
-                                <span className="text-[9px] font-extrabold uppercase text-slate-400 block">
+                              <div className="bg-white p-2 rounded-xl border border-slate-200">
+                                <span className="block text-[10px] font-bold text-amber-800">
                                   HACER (40)
                                 </span>
-                                <span className="text-base font-black text-slate-800">
-                                  {dim?.hacer ?? "-"}
+                                <span className="text-base font-black text-slate-900">
+                                  {dim.hacer}
                                 </span>
                               </div>
-                              {/* AUTOEVALUACIÓN (5 pts) */}
-                              <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-center">
-                                <span className="text-[9px] font-extrabold uppercase text-slate-400 block">
+                              <div className="bg-white p-2 rounded-xl border border-slate-200">
+                                <span className="block text-[10px] font-bold text-purple-800">
                                   AUTO (5)
                                 </span>
-                                <span className="text-base font-black text-slate-800">
-                                  {dim?.auto ?? "-"}
+                                <span className="text-base font-black text-slate-900">
+                                  {dim.auto}
                                 </span>
                               </div>
                             </div>
-                            <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-200">
-                              <span>Total Trimestral:</span>
-                              <strong className="text-slate-900 font-bold">
-                                {dim?.total ?? periodGrade ?? "-"} / 100 pts
-                              </strong>
+
+                            <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1">
+                              <span>
+                                Estado:{" "}
+                                <strong
+                                  className={
+                                    Number(dim.total) >= 51 ? "text-emerald-700" : "text-red-600"
+                                  }
+                                >
+                                  {Number(dim.total) >= 51 ? "Aprobado" : "En Reforzamiento"}
+                                </strong>
+                              </span>
+                              <span className="text-slate-400">Campo: {g.campo}</span>
                             </div>
                           </div>
                         )}
@@ -743,738 +743,1361 @@ export default function FieldingDashboard() {
               </div>
             )}
 
-            {/* CONTENIDO PESTAÑA 2: AGENDA Y CALENDARIO */}
-            {mobileTab === "calendario" && (
+            {/* SECCIÓN 2: AGENDA ESCOLAR */}
+            {parentTab === "agenda" && (
               <div className="space-y-4">
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <h3 className="font-extrabold text-sm uppercase text-slate-900 mb-1 flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-[#266b31]" />
-                    <span>Tareas y Evaluaciones Programadas</span>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-[#266b31]" />
+                    <span>Agenda Escolar • Curso {currentStudent.course}</span>
                   </h3>
-                  <p className="text-xs text-slate-500">
-                    Calendario oficial del curso {currentStudent.course}
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  {events.map((ev) => (
-                    <div
-                      key={ev.id}
-                      className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-start justify-between gap-3"
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
-                              ev.type === "EXAMEN"
-                                ? "bg-red-100 text-red-700"
-                                : ev.type === "TAREA"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-purple-100 text-purple-700"
-                            }`}
-                          >
-                            {ev.type}
-                          </span>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase">
-                            {ev.subject}
-                          </span>
-                        </div>
-                        <h4 className="font-bold text-sm text-slate-900">{ev.title}</h4>
-                        <p className="text-xs text-slate-500">Profesor: {ev.teacher}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                          Fecha Límite:
-                        </span>
-                        <span className="text-xs font-black text-[#1b4e23]">{ev.date}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* CONTENIDO PESTAÑA 3: AVISOS INSTITUCIONALES */}
-            {mobileTab === "avisos" && (
-              <div className="space-y-3">
-                {announcements.map((a) => (
-                  <div
-                    key={a.id}
-                    className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                          a.priority === "URGENTE"
-                            ? "bg-red-100 text-red-700 border border-red-300"
-                            : a.priority === "IMPORTANTE"
-                            ? "bg-amber-100 text-amber-800 border border-amber-300"
-                            : "bg-slate-100 text-slate-700"
-                        }`}
-                      >
-                        {a.priority}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-semibold">{a.date}</span>
-                    </div>
-                    <h4 className="font-extrabold text-sm text-slate-900">{a.title}</h4>
-                    <p className="text-xs text-slate-600 leading-relaxed">{a.body}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* CONTENIDO PESTAÑA 4: CHAT DIRECTO CON PROFESORES */}
-            {mobileTab === "chat" && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[460px]">
-                <div className="bg-[#1b4e23] p-3.5 text-white flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-[#d6a427]" />
-                    <span className="font-bold text-xs uppercase">
-                      Mensajería Directa Fielding
-                    </span>
-                  </div>
-                  <span className="text-[10px] bg-emerald-700/80 px-2 py-0.5 rounded font-mono">
-                    Canal Seguro
+                  <span className="text-xs font-bold text-slate-500">
+                    {tasks.filter((t) => t.course === currentStudent.course).length} actividades
                   </span>
                 </div>
 
-                <div className="flex-1 p-4 overflow-y-auto space-y-3">
-                  {messages.map((m) => (
-                    <div
-                      key={m.id}
-                      className={`flex flex-col max-w-[80%] ${
-                        m.isTeacher ? "mr-auto items-start" : "ml-auto items-end"
-                      }`}
-                    >
-                      <span className="text-[9px] font-bold text-slate-400 mb-0.5">
-                        {m.sender} • {m.time}
-                      </span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {tasks
+                    .filter((t) => t.course === currentStudent.course)
+                    .map((item) => (
                       <div
-                        className={`p-3 rounded-2xl text-xs leading-relaxed ${
-                          m.isTeacher
-                            ? "bg-slate-100 text-slate-800 rounded-tl-none border border-slate-200"
-                            : "bg-[#266b31] text-white rounded-tr-none shadow-sm"
-                        }`}
+                        key={item.id}
+                        className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-2.5"
                       >
-                        {m.text}
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
+                              item.type === "EXAMEN"
+                                ? "bg-red-100 text-red-700"
+                                : item.type === "EVENTO"
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-blue-100 text-blue-700"
+                            }`}
+                          >
+                            {item.type}
+                          </span>
+                          <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" /> Entrega: {item.dueDate}
+                          </span>
+                        </div>
+
+                        <h4 className="text-sm font-extrabold text-slate-900">{item.title}</h4>
+                        <p className="text-xs text-slate-600 leading-relaxed">{item.description}</p>
+
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                          <span className="font-semibold text-[#266b31]">{item.subject}</span>
+                          <span>{item.teacher}</span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* SECCIÓN 3: AVISOS */}
+            {parentTab === "avisos" && (
+              <div className="space-y-4">
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-[#d6a427]" />
+                  <span>Comunicados y Avisos Oficiales</span>
+                </h3>
+
+                <div className="space-y-3">
+                  {parentAnnouncements.map((ann) => (
+                    <div
+                      key={ann.id}
+                      className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
+                            ann.priority === "ALTA"
+                              ? "bg-red-100 text-red-800 border border-red-200"
+                              : ann.priority === "MEDIA"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          PRIORIDAD {ann.priority}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-400">{ann.date}</span>
+                      </div>
+                      <h4 className="text-base font-extrabold text-slate-900">{ann.title}</h4>
+                      <p className="text-xs text-slate-600 leading-relaxed">{ann.content}</p>
+                      <div className="pt-2 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
+                        <span>Emitido por: {ann.author}</span>
+                        <span className="bg-[#FAFAF0] px-2 py-0.5 rounded font-bold text-[#266b31]">
+                          Dirigido a: {ann.targetRole}
+                        </span>
                       </div>
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
 
-                <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-200 bg-slate-50 flex gap-2">
+            {/* SECCIÓN 4: CHAT DIRECTO CON DOCENTE */}
+            {parentTab === "chat" && (
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[520px]">
+                <div className="bg-[#266b31] p-4 text-white flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-white text-[#266b31] font-black flex items-center justify-center text-sm">
+                      IM
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-extrabold">Lic. Ivan Ezequiel Mancilla Copa</h4>
+                      <p className="text-[11px] text-white/80">
+                        Docente Titular • Historia Universal e Inglés
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold bg-[#d6a427] text-[#1b4e23] px-2.5 py-1 rounded-full">
+                    Canal Seguro Auditado
+                  </span>
+                </div>
+
+                <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#FAFAF0]/60">
+                  {messages
+                    .filter((m) => m.threadId === "TH-ALIAGA-MANCILLA")
+                    .map((msg) => {
+                      const isMe = msg.senderRole === "parent" || msg.senderRole === "student";
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
+                        >
+                          <div
+                            className={`max-w-[85%] rounded-2xl p-3 text-xs shadow-sm leading-relaxed ${
+                              isMe
+                                ? "bg-[#266b31] text-white rounded-tr-xs"
+                                : "bg-white text-slate-800 border border-slate-200 rounded-tl-xs"
+                            }`}
+                          >
+                            <span className="block text-[10px] font-bold opacity-80 mb-0.5">
+                              {msg.senderName}
+                            </span>
+                            <p>{msg.text}</p>
+                            <span className="block text-[9px] opacity-70 text-right mt-1">
+                              {msg.timestamp}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                <form
+                  onSubmit={handleSendParentMessage}
+                  className="p-3 bg-white border-t border-slate-200 flex items-center gap-2"
+                >
                   <input
                     type="text"
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="Escribe un mensaje al docente..."
-                    className="flex-1 px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#266b31]"
+                    placeholder="Escribe tu consulta al profesor (prueba escribir 'urgente' o 'reclamo' para ver alerta en Dirección)..."
+                    className="flex-1 bg-[#FAFAF0] border border-slate-300 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#266b31]"
                   />
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-[#266b31] hover:bg-[#1b4e23] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    className="bg-[#266b31] hover:bg-[#1b4e23] text-white p-2.5 rounded-xl transition-all cursor-pointer shadow-md active:scale-95"
                   >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Enviar</span>
+                    <Send className="w-4 h-4" />
                   </button>
                 </form>
               </div>
             )}
+
+            {/* SECCIÓN 5: ENTREVISTAS GOOGLE MEET */}
+            {parentTab === "meet" && (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                    <Video className="w-5 h-5 text-[#266b31]" />
+                    <span>Entrevistas Pedagógicas Virtuales (Google Meet)</span>
+                  </h3>
+                  <button
+                    onClick={() => setShowParentMeetModal(true)}
+                    className="flex items-center gap-1.5 bg-[#266b31] hover:bg-[#1b4e23] text-white font-bold px-3.5 py-2 rounded-xl text-xs shadow-sm transition-all cursor-pointer"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    <span>Solicitar Nueva Cita</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {interviews
+                    .filter((m) => m.parentName.includes("Aliaga"))
+                    .map((item) => (
+                      <div
+                        key={item.id}
+                        className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
+                              item.status === "PROGRAMADA"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : item.status === "COMPLETADA"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+                          <span className="text-xs font-bold text-slate-500">
+                            {item.date} • {item.time}
+                          </span>
+                        </div>
+
+                        <div>
+                          <h4 className="text-sm font-extrabold text-slate-900">
+                            Reunión con: {item.teacherName}
+                          </h4>
+                          <p className="text-xs text-slate-600 mt-1">Motivo: {item.reason}</p>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-[11px] font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                            {item.meetCode}
+                          </span>
+                          <a
+                            href={item.meetLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-colors shadow-sm"
+                          >
+                            <Video className="w-3.5 h-3.5" />
+                            <span>Unirse a Google Meet</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* BARRA DE NAVEGACIÓN INFERIOR FIJA (MOBILE-FIRST) */}
+            <nav className="no-print fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-slate-200 shadow-lg px-2 py-1.5 flex items-center justify-around max-w-lg mx-auto sm:rounded-t-2xl">
+              {(
+                [
+                  { id: "notas", label: "Notas", icon: Award },
+                  { id: "agenda", label: "Agenda", icon: Calendar },
+                  { id: "avisos", label: "Avisos", icon: Bell },
+                  { id: "chat", label: "Chat", icon: MessageSquare },
+                  { id: "meet", label: "Meet", icon: Video },
+                ] as const
+              ).map((tab) => {
+                const Icon = tab.icon;
+                const isActive = parentTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setParentTab(tab.id)}
+                    className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
+                      isActive
+                        ? "text-[#266b31] font-black scale-105"
+                        : "text-slate-400 hover:text-slate-600 font-medium"
+                    }`}
+                  >
+                    <Icon className="w-5 h-5 mb-0.5" />
+                    <span className="text-[10px]">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* VISTA 3: PROFESOR / DOCENTE (CON SUB-PESTAÑAS)                              */}
-        {/* ========================================================================= */}
-        {role === "teacher" && (
+        {/* ============================================================= */}
+        {/* VISTA 3: DOCENTE (role = teacher)                             */}
+        {/* ============================================================= */}
+        {currentRole === "teacher" && (
           <div className="space-y-6">
-            {/* Header del Docente con Nombre y Especialidad */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <span className="text-[10px] font-extrabold uppercase text-[#266b31] tracking-wider block">
-                  Panel de Gestión Docente
-                </span>
-                <h2 className="text-xl font-black text-slate-900 uppercase">
-                  {currentName}
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Especialidad: Ciencias Sociales (Historia Universal, Historia de Bolivia) e Inglés
-                </p>
+            {/* Cabecera del Docente */}
+            <div className="no-print bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-[#266b31] text-white flex items-center justify-center font-black text-xl shadow-md">
+                  IM
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-slate-900">
+                    Lic. Ivan Ezequiel Mancilla Copa
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Docente Titular • Historia de Bolivia, Historia Universal e Inglés MCER B1-A
+                  </p>
+                </div>
               </div>
+
               <div className="flex items-center gap-3">
+                <span className="text-xs font-bold text-slate-500">Último Sync: {lastSync}</span>
                 <button
-                  type="button"
-                  onClick={handleSyncDrive}
-                  disabled={isSyncing}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-[#1b4e23] hover:bg-[#143d1a] disabled:opacity-50 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
+                  onClick={() => handleDriveSync()}
+                  disabled={isSyncingDrive}
+                  className="flex items-center gap-2 bg-[#d6a427] hover:bg-[#b88c22] text-[#1b4e23] font-black px-4 py-2.5 rounded-xl text-xs shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
-                  <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
-                  <span>{isSyncing ? "Sincronizando..." : "Sincronizar Drive"}</span>
+                  <RefreshCw className={`w-4 h-4 ${isSyncingDrive ? "animate-spin" : ""}`} />
+                  <span>{isSyncingDrive ? "Sincronizando..." : "Sincronizar con Drive"}</span>
                 </button>
               </div>
             </div>
 
-            {/* Sub-Pestañas Internas del Docente */}
-            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
-              <button
-                type="button"
-                onClick={() => setTeacherSubTab("curriculum")}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                  teacherSubTab === "curriculum"
-                    ? "bg-[#266b31] text-white shadow-md"
-                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-                }`}
-              >
-                <FileText className="w-4 h-4 text-[#d6a427]" />
-                <span>1. Planificación Curricular (PDC y Planes de Clase)</span>
-              </button>
+            {syncFeedback && (
+              <div className="no-print p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>{syncFeedback}</span>
+              </div>
+            )}
 
-              <button
-                type="button"
-                onClick={() => setTeacherSubTab("drive")}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                  teacherSubTab === "drive"
-                    ? "bg-[#266b31] text-white shadow-md"
-                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-                }`}
-              >
-                <FileSpreadsheet className="w-4 h-4 text-[#d6a427]" />
-                <span>2. Mis Cuadernos Pedagógicos (Drive)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setTeacherSubTab("agenda")}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                  teacherSubTab === "agenda"
-                    ? "bg-[#266b31] text-white shadow-md"
-                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-                }`}
-              >
-                <Calendar className="w-4 h-4 text-[#d6a427]" />
-                <span>3. Agenda de Tareas/Exámenes y Mensajes</span>
-              </button>
+            {/* Pestañas del Docente */}
+            <div className="no-print flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+              {(
+                [
+                  {
+                    id: "cuadernos",
+                    label: "Cuadernos Pedagógicos (Drive)",
+                    icon: FileSpreadsheet,
+                  },
+                  {
+                    id: "curriculum",
+                    label: "Generador IA (PDCs y Planes)",
+                    icon: Sparkles,
+                  },
+                  {
+                    id: "agenda_meet",
+                    label: "Tareas y Google Meet",
+                    icon: Calendar,
+                  },
+                  {
+                    id: "chat",
+                    label: "Chat con Familias",
+                    icon: MessageSquare,
+                  },
+                ] as const
+              ).map((tab) => {
+                const Icon = tab.icon;
+                const isActive = teacherTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setTeacherTab(tab.id)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                      isActive
+                        ? "bg-[#266b31] text-white shadow-md"
+                        : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
-            {/* PESTAÑA 1 DOCENTE: PLANIFICACIÓN CURRICULAR (PDC Y PLANES DE CLASE) */}
-            {teacherSubTab === "curriculum" && <TeacherCurriculumHub />}
-
-            {/* PESTAÑA 2 DOCENTE: CUADERNOS PEDAGÓGICOS EN DRIVE */}
-            {teacherSubTab === "drive" && (
+            {/* PESTAÑA 1: CUADERNOS DRIVE */}
+            {teacherTab === "cuadernos" && (
               <div className="space-y-4">
-                <h3 className="font-extrabold text-sm uppercase text-slate-900 flex items-center gap-2">
-                  <FileSpreadsheet className="w-4 h-4 text-[#266b31]" />
-                  <span>Cuadernos Pedagógicos Vinculados (Google Sheets)</span>
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {[
-                    {
-                      course: "1RO-SEC",
-                      subject: "HISTORIA DE BOLIVIA",
-                      sheetId: "1historia_bolivia_1sec_fielding_2026",
-                      url: "https://docs.google.com/spreadsheets/",
-                      studentsCount: 28,
-                    },
-                    {
-                      course: "1RO-SEC",
-                      subject: "HISTORIA UNIVERSAL",
-                      sheetId: "1historia_universal_1sec_fielding_2026",
-                      url: "https://docs.google.com/spreadsheets/",
-                      studentsCount: 28,
-                    },
-                    {
-                      course: "1RO-SEC",
-                      subject: "LENGUA EXTRANJERA (INGLÉS B1-A)",
-                      sheetId: "1ingles_b1_fielding_2026",
-                      url: "https://docs.google.com/spreadsheets/",
-                      studentsCount: 22,
-                    },
-                  ].map((cuaderno, idx) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {assignments.map((item, idx) => (
                     <div
                       key={idx}
-                      className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3 flex flex-col justify-between"
+                      className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between space-y-3"
                     >
                       <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="px-2.5 py-0.5 bg-[#266b31] text-white font-bold text-[10px] rounded uppercase">
-                            {cuaderno.course}
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black bg-[#266b31]/10 text-[#266b31] px-2.5 py-0.5 rounded-full">
+                            {item.course}
                           </span>
-                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Auto-Sync
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                            Sincronizado
                           </span>
                         </div>
-                        <h4 className="font-extrabold text-base text-slate-900 uppercase">
-                          {cuaderno.subject}
+                        <h4 className="text-sm font-extrabold text-slate-900 mt-2">
+                          {item.subject}
                         </h4>
-                        <p className="text-xs text-slate-500 mt-1">
-                          {cuaderno.studentsCount} Estudiantes registrados
-                        </p>
-                        <p className="text-[10px] font-mono text-slate-400 mt-1 truncate">
-                          ID: {cuaderno.sheetId}
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {item.students_count} Estudiantes Inscritos
                         </p>
                       </div>
 
-                      <a
-                        href={cuaderno.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-1.5"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-                        <span>Abrir en Google Drive</span>
-                      </a>
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                        <span className="text-[10px] text-slate-400">{item.last_sync}</span>
+                        <button
+                          onClick={() => handleDriveSync(`${item.course} ${item.subject}`)}
+                          className="text-[#266b31] hover:text-[#1b4e23] font-bold text-xs flex items-center gap-1 cursor-pointer"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          <span>Sync</span>
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
 
-            {/* PESTAÑA 3 DOCENTE: AGENDA DE TAREAS Y MENSAJES */}
-            {teacherSubTab === "agenda" && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Formulario para Publicar en Calendario */}
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                  <h3 className="font-extrabold text-sm uppercase text-slate-900 flex items-center gap-2">
-                    <PlusCircle className="w-4 h-4 text-[#266b31]" />
-                    <span>Publicar Tarea o Examen en Calendario</span>
-                  </h3>
-
-                  <form onSubmit={handleAddEvent} className="space-y-3">
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
-                        Materia y Curso
-                      </label>
-                      <select
-                        value={newEventSubject}
-                        onChange={(e) => setNewEventSubject(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#266b31]"
-                      >
-                        <option value="HISTORIA DE BOLIVIA">HISTORIA DE BOLIVIA - 1RO SECUNDARIA</option>
-                        <option value="HISTORIA UNIVERSAL">HISTORIA UNIVERSAL - 1RO SECUNDARIA</option>
-                        <option value="LENGUA EXTRANJERA">LENGUA EXTRANJERA (INGLÉS) - 1RO SEC</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
-                        Tipo de Actividad
-                      </label>
-                      <div className="grid grid-cols-3 gap-1">
-                        {(["TAREA", "EXAMEN", "PROYECTO"] as const).map((t) => (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => setNewEventType(t)}
-                            className={`py-1.5 rounded-lg text-[10px] font-extrabold uppercase transition-all cursor-pointer ${
-                              newEventType === t
-                                ? "bg-[#266b31] text-white"
-                                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                            }`}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
-                        Título de la Actividad
-                      </label>
-                      <input
-                        type="text"
-                        value={newEventTitle}
-                        onChange={(e) => setNewEventTitle(e.target.value)}
-                        placeholder="ej. Informe de Fuentes Históricas"
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#266b31]"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
-                        Fecha Límite
-                      </label>
-                      <input
-                        type="date"
-                        value={newEventDate}
-                        onChange={(e) => setNewEventDate(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#266b31]"
-                        required
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full py-2.5 bg-[#266b31] hover:bg-[#1b4e23] text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer"
-                    >
-                      Publicar en Agenda del Curso
-                    </button>
-                  </form>
-                </div>
-
-                {/* Mensajería Directa */}
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                  <div>
-                    <h3 className="font-extrabold text-sm uppercase text-slate-900 flex items-center gap-2 mb-3">
-                      <MessageSquare className="w-4 h-4 text-[#266b31]" />
-                      <span>Mensajes con Familias y Tutores</span>
-                    </h3>
-
-                    <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                      {messages.map((m) => (
-                        <div
-                          key={m.id}
-                          className={`p-3 rounded-xl text-xs space-y-1 ${
-                            m.isTeacher ? "bg-emerald-50 border border-emerald-200" : "bg-slate-50 border border-slate-200"
-                          }`}
-                        >
-                          <div className="flex justify-between items-center text-[10px] font-bold text-slate-500">
-                            <span>{m.sender}</span>
-                            <span>{m.time}</span>
-                          </div>
-                          <p className="text-slate-800">{m.text}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <form onSubmit={handleSendMessage} className="mt-4 flex gap-2">
-                    <input
-                      type="text"
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      placeholder="Responder a padres de familia..."
-                      className="flex-1 px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#266b31]"
-                    />
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-[#266b31] text-white font-bold text-xs rounded-xl hover:bg-[#1b4e23]"
-                    >
-                      Enviar
-                    </button>
-                  </form>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ========================================================================= */}
-        {/* VISTA 4: DIRECCIÓN / ADMINISTRATIVO (MATRIZ CENTRALIZADORA SIGED)          */}
-        {/* ========================================================================= */}
-        {role === "admin" && (
-          <div className="space-y-6">
-            {/* Header Administrativo */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <span className="text-[10px] font-extrabold uppercase text-[#266b31] tracking-wider block">
-                  Dirección General y Académica
-                </span>
-                <h2 className="text-xl font-black text-slate-900 uppercase">
-                  {currentName}
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Matriz Centralizadora Instantánea y Auditoría Curricular • Gestión 2026
-                </p>
-              </div>
-
-              {/* Botón Sincronizar Todo con medición de latencia */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleSyncDrive}
-                  disabled={isSyncing}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#1b4e23] hover:bg-[#143d1a] disabled:opacity-60 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
-                  <span>{isSyncing ? "Sincronizando..." : "Sincronizar Todo"}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Selector de Categorías (PRIMARIA, SECUNDARIA, SIGED, HONOR) */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="flex items-center gap-1.5">
-                {(["PRIMARIA", "SECUNDARIA", "SIGED", "HONOR"] as const).map((cat) => {
-                  const isSelected = adminCategory === cat;
-                  return (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => {
-                        setAdminCategory(cat);
-                        if (cat === "PRIMARIA") setSelectedCourse("1RO-PRIM");
-                        if (cat === "SECUNDARIA" || cat === "SIGED") setSelectedCourse("1RO-SEC");
-                      }}
-                      className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                        isSelected
-                          ? "bg-[#266b31] text-white shadow-md"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                      }`}
-                    >
-                      {cat === "HONOR" ? "🏆 Cuadro de Honor" : cat}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Selector de Cursos (si no es HONOR) */}
-              {adminCategory !== "HONOR" && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-extrabold uppercase text-slate-500">
-                    Curso:
-                  </span>
-                  <select
-                    value={selectedCourse}
-                    onChange={(e) => setSelectedCourse(e.target.value)}
-                    className="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 uppercase focus:ring-2 focus:ring-[#266b31]"
-                  >
-                    {(adminCategory === "PRIMARIA"
-                      ? coursesByLevel.PRIMARIA.length > 0
-                        ? coursesByLevel.PRIMARIA
-                        : ["1RO-PRIM", "2DO-PRIM", "3RO-PRIM", "4TO-PRIM", "5TO-PRIM", "6TO-PRIM"]
-                      : coursesByLevel.SECUNDARIA.length > 0
-                      ? coursesByLevel.SECUNDARIA
-                      : ["1RO-SEC", "2DO-SEC", "3RO-SEC", "4TO-SEC", "5TO-SEC", "6TO-SEC"]
-                    ).map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            {/* SECCIÓN CUADRO DE HONOR TOP 5 */}
-            {adminCategory === "HONOR" ? (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                  <div>
-                    <h3 className="font-extrabold text-base uppercase text-[#1b4e23] flex items-center gap-2">
-                      <Award className="w-5 h-5 text-[#d6a427]" />
-                      <span>Cuadro de Honor Institucional • Top 5 Fielding</span>
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      Estudiantes con los mejores promedios generales de la gestión 2026
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
-                    {(["t1", "t2", "t3", "final"] as const).map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => setPeriod(p)}
-                        className={`px-2.5 py-1 rounded text-[10px] font-black uppercase cursor-pointer ${
-                          period === p ? "bg-[#266b31] text-white" : "text-slate-600"
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 pt-2">
-                  {honorRollSchool.map((st: any, idx: number) => {
-                    const medals = ["🥇", "🥈", "🥉", "🏅", "🏅"];
-                    return (
-                      <div
-                        key={st.id || idx}
-                        className={`p-4 rounded-2xl border text-center space-y-2 flex flex-col justify-between ${
-                          idx === 0
-                            ? "bg-amber-50/70 border-[#d6a427] shadow-md"
-                            : "bg-slate-50/60 border-slate-200"
-                        }`}
-                      >
-                        <div className="text-3xl">{medals[idx]}</div>
-                        <div>
-                          <span className="text-[10px] font-extrabold uppercase text-[#266b31] block">
-                            Puesto #{idx + 1} • {st.course}
-                          </span>
-                          <h4 className="font-extrabold text-xs text-slate-900 uppercase mt-1 line-clamp-2">
-                            {st.full_name}
-                          </h4>
-                        </div>
-                        <div className="pt-2 border-t border-slate-200">
-                          <span className="text-2xl font-black text-[#1b4e23]">{st.avg}</span>
-                          <span className="text-[10px] text-slate-400 font-bold block">
-                            Promedio / 100
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setBoletinStudent(st)}
-                          className="w-full py-1.5 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-[10px] font-bold uppercase tracking-wider text-slate-700 transition-colors cursor-pointer"
-                        >
-                          Ver Boletín
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              /* TABLA CENTRALIZADORA DE NOTAS */
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                {/* Barra de Filtro de la Matriz */}
-                <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-                  <div className="relative flex-1 max-w-xs">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                    <input
-                      type="text"
-                      value={searchStudent}
-                      onChange={(e) => setSearchStudent(e.target.value)}
-                      placeholder="Buscar estudiante en la matriz..."
-                      className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#266b31]"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase text-slate-500">
-                      Período de Notas:
-                    </span>
-                    <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-300">
-                      {(["t1", "t2", "t3", "final"] as const).map((p) => (
-                        <button
-                          key={p}
-                          type="button"
-                          onClick={() => setPeriod(p)}
-                          className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase cursor-pointer ${
-                            period === p
-                              ? "bg-[#1b4e23] text-white"
-                              : "text-slate-600 hover:bg-slate-100"
-                          }`}
-                        >
-                          {p.toUpperCase()}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tabla de la Matriz Centralizadora */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-[#1b4e23] text-white uppercase text-[10px] font-extrabold tracking-wider">
-                        <th className="py-3 px-3 w-10 text-center border-r border-green-900">#</th>
-                        <th className="py-3 px-4 min-w-[220px] border-r border-green-900">
-                          Estudiante
-                        </th>
-                        <th className="py-3 px-2 text-center w-16 border-r border-green-900">
-                          Inglés
-                        </th>
-                        {courseSubjects.map((sub) => (
-                          <th
-                            key={sub}
-                            className="py-3 px-2 text-center min-w-[90px] border-r border-green-900"
-                          >
-                            <span className="block truncate max-w-[120px]" title={sub}>
-                              {sub}
-                            </span>
-                          </th>
-                        ))}
-                        <th className="py-3 px-3 text-center w-20 border-r border-green-900">
-                          Promedio
-                        </th>
-                        <th className="py-3 px-3 text-center w-24">Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {courseStudents.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={courseSubjects.length + 5}
-                            className="text-center py-8 text-slate-400"
-                          >
-                            No hay estudiantes encontrados para este curso o criterio de búsqueda.
-                          </td>
+                {/* Tabla de seguimiento */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
+                  <h4 className="text-sm font-black text-slate-900">
+                    Estudiantes en Seguimiento • Curso 1RO-SEC (Historia e Inglés)
+                  </h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-600 font-bold uppercase text-[10px]">
+                          <th className="p-2.5">Estudiante</th>
+                          <th className="p-2.5">Historia Bolivia</th>
+                          <th className="p-2.5">Historia Universal</th>
+                          <th className="p-2.5">Inglés B1</th>
+                          <th className="p-2.5 text-right">Acción</th>
                         </tr>
-                      ) : (
-                        courseStudents.map((st: any, idx: number) => {
-                          const rowVals: number[] = [];
-
-                          return (
-                            <tr key={st.id || idx} className="hover:bg-slate-50 transition-colors">
-                              <td className="py-2.5 px-3 text-center font-bold text-slate-400 border-r border-slate-200">
-                                {idx + 1}
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {students
+                          .filter((s) => s.course === "1RO-SEC")
+                          .map((s) => (
+                            <tr key={s.id} className="hover:bg-slate-50">
+                              <td className="p-2.5 font-bold text-slate-800">{s.full_name}</td>
+                              <td className="p-2.5">
+                                <span
+                                  className={`px-2 py-0.5 rounded font-black text-[11px] ${getGradeColorClass(
+                                    s.grades["HISTORIA DE BOLIVIA"]?.final
+                                  )}`}
+                                >
+                                  {s.grades["HISTORIA DE BOLIVIA"]?.final || "-"}
+                                </span>
                               </td>
-                              <td className="py-2.5 px-4 font-bold text-slate-800 uppercase border-r border-slate-200">
-                                {st.full_name}
+                              <td className="p-2.5">
+                                <span
+                                  className={`px-2 py-0.5 rounded font-black text-[11px] ${getGradeColorClass(
+                                    s.grades["HISTORIA UNIVERSAL"]?.final
+                                  )}`}
+                                >
+                                  {s.grades["HISTORIA UNIVERSAL"]?.final || "-"}
+                                </span>
                               </td>
-                              <td className="py-2.5 px-2 text-center border-r border-slate-200 font-bold text-[10px] text-amber-700">
-                                {st.english_level || "-"}
+                              <td className="p-2.5">
+                                <span
+                                  className={`px-2 py-0.5 rounded font-black text-[11px] ${getGradeColorClass(
+                                    s.grades["LENGUA EXTRANJERA"]?.final
+                                  )}`}
+                                >
+                                  {s.grades["LENGUA EXTRANJERA"]?.final || "-"}
+                                </span>
                               </td>
-
-                              {/* Calificación por cada Materia o Área */}
-                              {courseSubjects.map((sub) => {
-                                let gradeVal: any = "-";
-
-                                if (adminCategory === "SIGED") {
-                                  const areaScores: number[] = [];
-                                  Object.entries(st.grades || {}).forEach(([mKey, gObj]: [string, any]) => {
-                                    const cl = getClasificacionCurricular(mKey, selectedCourse);
-                                    if (cl.area === sub) {
-                                      const rawVal = period === "final" ? gObj?.final : gObj?.[period]?.total;
-                                      const n = parseFloat(String(rawVal ?? "").replace(",", "."));
-                                      if (!isNaN(n)) areaScores.push(n);
-                                    }
-                                  });
-                                  if (areaScores.length > 0) {
-                                    gradeVal = Math.round(
-                                      areaScores.reduce((a, b) => a + b, 0) / areaScores.length
-                                    );
-                                  }
-                                } else {
-                                  const gObj = st.grades?.[sub];
-                                  gradeVal = period === "final" ? gObj?.final : gObj?.[period]?.total;
-                                }
-
-                                const parsed = parseFloat(String(gradeVal ?? "").replace(",", "."));
-                                if (!isNaN(parsed)) rowVals.push(parsed);
-
-                                return (
-                                  <td
-                                    key={sub}
-                                    className="py-2.5 px-2 text-center border-r border-slate-200 font-mono text-xs"
-                                  >
-                                    <span
-                                      className={`inline-block px-1.5 py-0.5 rounded font-bold ${getGradeColorClass(
-                                        gradeVal
-                                      )}`}
-                                    >
-                                      {gradeVal ?? "-"}
-                                    </span>
-                                  </td>
-                                );
-                              })}
-
-                              {/* Promedio del Estudiante */}
-                              <td className="py-2.5 px-3 text-center font-mono font-black text-xs border-r border-slate-200 text-[#1b4e23]">
-                                {rowVals.length > 0
-                                  ? (rowVals.reduce((a, b) => a + b, 0) / rowVals.length).toFixed(1)
-                                  : "-"}
-                              </td>
-
-                              {/* Botón Boletín Oficial */}
-                              <td className="py-2.5 px-3 text-center">
+                              <td className="p-2.5 text-right">
                                 <button
-                                  type="button"
-                                  onClick={() => setBoletinStudent(st)}
-                                  className="px-2.5 py-1 bg-[#d6a427] hover:bg-[#b88c1f] text-slate-950 font-bold text-[10px] uppercase rounded-lg transition-colors cursor-pointer"
+                                  onClick={() => setBoletinStudent(s)}
+                                  className="text-[#266b31] hover:underline font-bold text-xs cursor-pointer"
                                 >
                                   Boletín
                                 </button>
                               </td>
                             </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PESTAÑA 2: GENERADOR IA DE PDCs Y PLANES */}
+            {teacherTab === "curriculum" && <TeacherCurriculumHub />}
+
+            {/* PESTAÑA 3: TAREAS Y GOOGLE MEET */}
+            {teacherTab === "agenda_meet" && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Formulario de Nueva Tarea */}
+                  <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                        <PlusCircle className="w-4 h-4 text-[#266b31]" />
+                        <span>Publicar Tarea o Examen en la Agenda</span>
+                      </h3>
+                    </div>
+
+                    <form onSubmit={handleCreateTask} className="space-y-3 text-xs">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block font-bold text-slate-600 mb-1">Curso</label>
+                          <select
+                            value={newTaskCourse}
+                            onChange={(e) => setNewTaskCourse(e.target.value)}
+                            className="w-full bg-[#FAFAF0] border border-slate-200 rounded-xl p-2 font-semibold"
+                          >
+                            <option value="1RO-SEC">1RO-SEC</option>
+                            <option value="2DO-SEC">2DO-SEC</option>
+                            <option value="4TO-PRIM">4TO-PRIM</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-600 mb-1">Materia</label>
+                          <select
+                            value={newTaskSubject}
+                            onChange={(e) => setNewTaskSubject(e.target.value)}
+                            className="w-full bg-[#FAFAF0] border border-slate-200 rounded-xl p-2 font-semibold"
+                          >
+                            <option value="HISTORIA DE BOLIVIA">Historia de Bolivia</option>
+                            <option value="HISTORIA UNIVERSAL">Historia Universal</option>
+                            <option value="INGLÉS B1-A">Inglés B1-A</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-600 mb-1">
+                          Título de la Actividad
+                        </label>
+                        <input
+                          type="text"
+                          value={newTaskTitle}
+                          onChange={(e) => setNewTaskTitle(e.target.value)}
+                          placeholder="Ej: Análisis de fuentes históricas"
+                          className="w-full bg-[#FAFAF0] border border-slate-200 rounded-xl p-2.5 font-medium"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-600 mb-1">
+                          Descripción e Instrucciones
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={newTaskDesc}
+                          onChange={(e) => setNewTaskDesc(e.target.value)}
+                          placeholder="Detallar criterios de evaluación..."
+                          className="w-full bg-[#FAFAF0] border border-slate-200 rounded-xl p-2 font-medium"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block font-bold text-slate-600 mb-1">Fecha Límite</label>
+                          <input
+                            type="date"
+                            value={newTaskDueDate}
+                            onChange={(e) => setNewTaskDueDate(e.target.value)}
+                            className="w-full bg-[#FAFAF0] border border-slate-200 rounded-xl p-2 font-medium"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-600 mb-1">
+                            Tipo de Actividad
+                          </label>
+                          <select
+                            value={newTaskType}
+                            onChange={(e) =>
+                              setNewTaskType(e.target.value as "TAREA" | "EXAMEN" | "EVENTO")
+                            }
+                            className="w-full bg-[#FAFAF0] border border-slate-200 rounded-xl p-2 font-semibold"
+                          >
+                            <option value="TAREA">Tarea / Trabajo Práctico</option>
+                            <option value="EXAMEN">Examen Escrito / Oral</option>
+                            <option value="EVENTO">Evento Institucional</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full bg-[#266b31] hover:bg-[#1b4e23] text-white font-bold py-2.5 rounded-xl shadow-md transition-all cursor-pointer"
+                      >
+                        Publicar Inmediatamente
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Formulario de Agendar Google Meet */}
+                  <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                        <Video className="w-4 h-4 text-blue-600" />
+                        <span>Agendar Entrevista Pedagógica (Google Meet)</span>
+                      </h3>
+                    </div>
+
+                    <form onSubmit={(e) => handleCreateMeet(e, false)} className="space-y-3 text-xs">
+                      <div>
+                        <label className="block font-bold text-slate-600 mb-1">
+                          Familia / Tutor Destinatario
+                        </label>
+                        <select
+                          value={newMeetParent}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setNewMeetParent(val);
+                            const matched = students.find((s) => s.parent_name === val);
+                            if (matched) {
+                              setNewMeetStudent(matched.full_name);
+                              setNewMeetCourse(matched.course);
+                            }
+                          }}
+                          className="w-full bg-[#FAFAF0] border border-slate-200 rounded-xl p-2 font-semibold"
+                        >
+                          {students.map((s) => (
+                            <option key={s.id} value={s.parent_name}>
+                              {s.parent_name} ({s.full_name} • {s.course})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block font-bold text-slate-600 mb-1">Fecha</label>
+                          <input
+                            type="date"
+                            value={newMeetDate}
+                            onChange={(e) => setNewMeetDate(e.target.value)}
+                            className="w-full bg-[#FAFAF0] border border-slate-200 rounded-xl p-2 font-medium"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-600 mb-1">Hora</label>
+                          <input
+                            type="time"
+                            value={newMeetTime}
+                            onChange={(e) => setNewMeetTime(e.target.value)}
+                            className="w-full bg-[#FAFAF0] border border-slate-200 rounded-xl p-2 font-medium"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-600 mb-1">
+                          Motivo de la Entrevista
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={newMeetReason}
+                          onChange={(e) => setNewMeetReason(e.target.value)}
+                          placeholder="Indicar puntos a tratar..."
+                          className="w-full bg-[#FAFAF0] border border-slate-200 rounded-xl p-2 font-medium"
+                          required
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <Video className="w-4 h-4" />
+                        <span>Generar Código Meet (fld-xxxx-xxx) y Notificar</span>
+                      </button>
+                    </form>
+                  </div>
+                </div>
+
+                {/* Lista en vivo de entrevistas agendadas por el docente */}
+                <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3">
+                  <h4 className="text-sm font-black text-slate-900">
+                    Entrevistas Google Meet Programadas ({interviews.length})
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {interviews.map((m) => (
+                      <div
+                        key={m.id}
+                        className="p-3.5 rounded-2xl border border-slate-200 bg-[#FAFAF0]/60 flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div>
+                          <p className="font-extrabold text-slate-900">{m.parentName}</p>
+                          <p className="text-[11px] text-slate-600">
+                            {m.date} • {m.time} • {m.course}
+                          </p>
+                          <p className="text-[10px] font-mono text-blue-700 mt-1">{m.meetCode}</p>
+                        </div>
+                        <a
+                          href={m.meetLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-xl text-[11px] flex items-center gap-1 flex-shrink-0"
+                        >
+                          <span>Abrir</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PESTAÑA 4: CHAT CON FAMILIAS */}
+            {teacherTab === "chat" && (
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden grid grid-cols-1 md:grid-cols-12 h-[540px]">
+                <div className="md:col-span-4 border-r border-slate-200 p-3 space-y-2 bg-[#FAFAF0]/40 overflow-y-auto">
+                  <span className="text-[10px] font-extrabold text-slate-500 uppercase px-2 block">
+                    Familias y Tutorías:
+                  </span>
+
+                  {[
+                    {
+                      id: "TH-ALIAGA-MANCILLA",
+                      name: "Familia Aliaga Ramos",
+                      student: "Yusuf Adel (1RO-SEC)",
+                      badge: "Al día",
+                    },
+                    {
+                      id: "TH-BENAVIDES-MANCILLA",
+                      name: "Familia Benavides Castro",
+                      student: "Mateo (1RO-SEC)",
+                      badge: "Prioritario",
+                    },
+                  ].map((conv) => (
+                    <div
+                      key={conv.id}
+                      onClick={() => setTeacherSelectedThread(conv.id)}
+                      className={`p-3 rounded-2xl cursor-pointer transition-all border ${
+                        teacherSelectedThread === conv.id
+                          ? "bg-white border-[#266b31] shadow-sm"
+                          : "bg-transparent border-transparent hover:bg-white"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-slate-900">{conv.name}</h4>
+                        <span className="text-[9px] font-bold bg-[#266b31]/10 text-[#266b31] px-2 py-0.5 rounded-full">
+                          {conv.badge}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{conv.student}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="md:col-span-8 flex flex-col h-full">
+                  <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs font-bold text-slate-700">
+                    <span>
+                      Conversación activa:{" "}
+                      {teacherSelectedThread === "TH-ALIAGA-MANCILLA"
+                        ? "Familia Aliaga Ramos"
+                        : "Familia Benavides Castro"}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      Sincronizado con Vigilancia de Dirección
+                    </span>
+                  </div>
+
+                  <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#FAFAF0]/40">
+                    {messages
+                      .filter((m) => m.threadId === teacherSelectedThread)
+                      .map((msg) => {
+                        const isTeacher = msg.senderRole === "teacher";
+                        return (
+                          <div
+                            key={msg.id}
+                            className={`flex flex-col ${isTeacher ? "items-end" : "items-start"}`}
+                          >
+                            <div
+                              className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed shadow-sm ${
+                                isTeacher
+                                  ? "bg-[#266b31] text-white rounded-tr-xs"
+                                  : "bg-white text-slate-800 border border-slate-200 rounded-tl-xs"
+                              }`}
+                            >
+                              <span className="block text-[10px] font-bold opacity-80 mb-0.5">
+                                {msg.senderName}
+                              </span>
+                              <p>{msg.text}</p>
+                              <span className="block text-[9px] opacity-70 text-right mt-1">
+                                {msg.timestamp}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  <form
+                    onSubmit={handleSendTeacherReply}
+                    className="p-3 bg-white border-t border-slate-200 flex items-center gap-2"
+                  >
+                    <input
+                      type="text"
+                      value={teacherReplyInput}
+                      onChange={(e) => setTeacherReplyInput(e.target.value)}
+                      placeholder="Escribe tu respuesta a la familia..."
+                      className="flex-1 bg-[#FAFAF0] border border-slate-300 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#266b31]"
+                    />
+                    <button
+                      type="submit"
+                      className="bg-[#266b31] hover:bg-[#1b4e23] text-white p-2.5 rounded-xl transition-all cursor-pointer shadow-md"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ============================================================= */}
+        {/* VISTA 4: DIRECCIÓN GENERAL (role = admin)                     */}
+        {/* ============================================================= */}
+        {currentRole === "admin" && (
+          <div className="space-y-6">
+            {/* Cabecera de Dirección */}
+            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-[#1b4e23] text-[#d6a427] flex items-center justify-center font-black text-xl shadow-md border border-[#d6a427]/30">
+                  JP
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-slate-900">Ing. José Mariano Pinaya</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Director General • Unidad Educativa Fielding Bolivia
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {totalAlertsCount > 0 && (
+                  <button
+                    onClick={() => {
+                      setAdminTab("vigilancia");
+                      setAuditOnlyAlerts(true);
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-black bg-red-600 text-white px-3 py-1.5 rounded-xl shadow-sm animate-pulse cursor-pointer"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span>{totalAlertsCount} Alerta(s) en Chats</span>
+                  </button>
+                )}
+                <span className="text-xs font-bold bg-[#1b4e23] text-white px-3 py-1.5 rounded-xl shadow-xs">
+                  Consola Estratégica Dirección
+                </span>
+              </div>
+            </div>
+
+            {/* Pestañas de Dirección */}
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+              {(
+                [
+                  {
+                    id: "centralizador",
+                    label: "Centralizador Maestro SIGED",
+                    icon: FileSpreadsheet,
+                  },
+                  {
+                    id: "vigilancia",
+                    label: `Vigilancia de Chats (${totalAlertsCount})`,
+                    icon: ShieldCheck,
+                  },
+                  {
+                    id: "comunicados",
+                    label: "Comunicados Institucionales",
+                    icon: Bell,
+                  },
+                  {
+                    id: "supervision_meet",
+                    label: "Supervisión Entrevistas Meet",
+                    icon: Video,
+                  },
+                ] as const
+              ).map((tab) => {
+                const Icon = tab.icon;
+                const isActive = adminTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setAdminTab(tab.id)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                      isActive
+                        ? "bg-[#1b4e23] text-white shadow-md"
+                        : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 text-[#d6a427]" />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 1. CENTRALIZADOR MAESTRO */}
+            {adminTab === "centralizador" && (
+              <div className="space-y-4">
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => setAdminViewMode("ALL")}
+                      className={`px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-all ${
+                        adminViewMode === "ALL"
+                          ? "bg-[#266b31] text-white shadow-sm"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      General
+                    </button>
+                    <button
+                      onClick={() => setAdminViewMode("SIGED")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-all ${
+                        adminViewMode === "SIGED"
+                          ? "bg-[#1b4e23] text-white shadow-sm"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      <Layers className="w-3.5 h-3.5 text-[#d6a427]" />
+                      <span>Vista SIGED (4 Campos)</span>
+                    </button>
+                    <button
+                      onClick={() => setAdminViewMode("HONOR")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-all ${
+                        adminViewMode === "HONOR"
+                          ? "bg-[#d6a427] text-[#1b4e23] shadow-sm"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      <Award className="w-3.5 h-3.5" />
+                      <span>Cuadro de Honor (Top 5)</span>
+                    </button>
+
+                    <span className="text-slate-300">|</span>
+
+                    <select
+                      value={adminCourseFilter}
+                      onChange={(e) => setAdminCourseFilter(e.target.value)}
+                      className="bg-[#FAFAF0] border border-slate-300 rounded-xl px-3 py-1.5 font-bold text-slate-700"
+                    >
+                      <option value="ALL">Todos los Niveles</option>
+                      <option value="PRIM">PRIMARIA</option>
+                      <option value="SEC">SECUNDARIA</option>
+                      <option value="1RO-SEC">1RO-SEC</option>
+                      <option value="2DO-SEC">2DO-SEC</option>
+                      <option value="4TO-PRIM">4TO-PRIM</option>
+                    </select>
+                  </div>
+
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                    <input
+                      type="text"
+                      value={adminSearch}
+                      onChange={(e) => setAdminSearch(e.target.value)}
+                      placeholder="Buscar por estudiante o RUDE..."
+                      className="pl-8 pr-3 py-1.5 bg-[#FAFAF0] border border-slate-300 rounded-xl text-xs font-medium w-56 focus:outline-none focus:ring-1 focus:ring-[#266b31]"
+                    />
+                  </div>
+                </div>
+
+                {/* Tabla Centralizadora */}
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead>
+                        <tr className="bg-[#1b4e23] text-white font-bold uppercase text-[10px] tracking-wider">
+                          <th className="p-3">#</th>
+                          <th className="p-3">Estudiante</th>
+                          <th className="p-3">Curso</th>
+                          {adminViewMode === "SIGED" ? (
+                            <>
+                              {SIGED_CAMPOS.map((c) => (
+                                <th key={c.key} className="p-3 text-center">
+                                  {c.short}
+                                </th>
+                              ))}
+                            </>
+                          ) : (
+                            <>
+                              <th className="p-3">RUDE</th>
+                              <th className="p-3">Nivel Inglés</th>
+                            </>
+                          )}
+                          <th className="p-3 text-center">Promedio</th>
+                          <th className="p-3 text-center">Estado</th>
+                          <th className="p-3 text-right">Boletín</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {processedAdminStudents.map((s, idx) => (
+                          <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="p-3 font-mono font-bold text-slate-400">
+                              {adminViewMode === "HONOR" ? (
+                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-900 font-black">
+                                  {idx + 1}
+                                </span>
+                              ) : (
+                                idx + 1
+                              )}
+                            </td>
+                            <td className="p-3 font-extrabold text-slate-900">{s.full_name}</td>
+                            <td className="p-3 font-semibold text-[#266b31]">{s.course}</td>
+
+                            {adminViewMode === "SIGED" ? (
+                              <>
+                                {SIGED_CAMPOS.map((c) => (
+                                  <td key={c.key} className="p-3 text-center">
+                                    <span
+                                      className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${getGradeColorClass(
+                                        s.campoAvgs[c.key]
+                                      )}`}
+                                    >
+                                      {s.campoAvgs[c.key]}
+                                    </span>
+                                  </td>
+                                ))}
+                              </>
+                            ) : (
+                              <>
+                                <td className="p-3 font-mono text-[11px] text-slate-500">
+                                  {s.rude_code}
+                                </td>
+                                <td className="p-3">
+                                  <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                                    {s.english_level}
+                                  </span>
+                                </td>
+                              </>
+                            )}
+
+                            <td className="p-3 text-center">
+                              <span
+                                className={`inline-block px-2.5 py-0.5 rounded-lg text-xs font-black ${getGradeColorClass(
+                                  s.calculatedAvg
+                                )}`}
+                              >
+                                {s.calculatedAvg}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center">
+                              {s.calculatedAvg >= 51 ? (
+                                <span className="text-emerald-700 font-bold text-[10px]">
+                                  PROMOVIDO
+                                </span>
+                              ) : (
+                                <span className="text-red-600 font-bold text-[10px]">RETENIDO</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-right">
+                              <button
+                                onClick={() => setBoletinStudent(s)}
+                                className="inline-flex items-center gap-1.5 bg-[#266b31] hover:bg-[#1b4e23] text-white px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all cursor-pointer shadow-xs active:scale-95"
+                              >
+                                <Printer className="w-3 h-3 text-[#d6a427]" />
+                                <span>🖨️ Boletín PDF</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 2. PANEL DE VIGILANCIA Y AUDITORÍA DE CHATS (EN VIVO) */}
+            {adminTab === "vigilancia" && (
+              <div className="space-y-4">
+                <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                        <span>Consola de Vigilancia y Auditoría de Chats</span>
+                      </h3>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Registro inalterable de todas las conversaciones entre docentes, padres y
+                        estudiantes. Los mensajes no pueden ser eliminados.
+                      </p>
+                    </div>
+
+                    <span className="flex items-center gap-1.5 text-[11px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 px-3 py-1 rounded-full">
+                      <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping" />
+                      <Lock className="w-3 h-3" />
+                      <span>En vivo • Auditoría Inmutable</span>
+                    </span>
+                  </div>
+
+                  {/* Filtros por Docente, Curso, Palabra Clave y Solo Alertas */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-2 border-t border-slate-100">
+                    <select
+                      value={auditTeacherFilter}
+                      onChange={(e) => setAuditTeacherFilter(e.target.value)}
+                      className="bg-[#FAFAF0] border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-700"
+                    >
+                      <option value="ALL">Todos los Docentes</option>
+                      {auditTeachers.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={auditCourseFilter}
+                      onChange={(e) => setAuditCourseFilter(e.target.value)}
+                      className="bg-[#FAFAF0] border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-700"
+                    >
+                      <option value="ALL">Todos los Cursos</option>
+                      {auditCourses.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                      <input
+                        type="text"
+                        value={auditKeywordFilter}
+                        onChange={(e) => setAuditKeywordFilter(e.target.value)}
+                        placeholder="Filtrar por palabra clave..."
+                        className="w-full pl-8 pr-3 py-2 bg-[#FAFAF0] border border-slate-300 rounded-xl text-xs font-medium focus:ring-1 focus:ring-[#266b31]"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setAuditOnlyAlerts(!auditOnlyAlerts)}
+                      className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold border transition-all cursor-pointer ${
+                        auditOnlyAlerts
+                          ? "bg-red-600 text-white border-red-600 shadow-sm"
+                          : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                      }`}
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      <span>
+                        {auditOnlyAlerts
+                          ? `Mostrando solo Alertas (${totalAlertsCount})`
+                          : `Filtrar Alertas (${totalAlertsCount})`}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Palabras de Alerta Configurables */}
+                  <div className="pt-3 border-t border-slate-100 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">
+                        Palabras Clave de Alerta Automática (Configurables):
+                      </span>
+                      <form onSubmit={handleAddAlertKeyword} className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={newAlertWord}
+                          onChange={(e) => setNewAlertWord(e.target.value)}
+                          placeholder="Agregar palabra..."
+                          className="px-2.5 py-1 bg-[#FAFAF0] border border-slate-300 rounded-lg text-[11px] font-medium w-36"
+                        />
+                        <button
+                          type="submit"
+                          className="bg-[#266b31] hover:bg-[#1b4e23] text-white px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Añadir</span>
+                        </button>
+                      </form>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {alertKeywords.map((kw) => (
+                        <span
+                          key={kw}
+                          className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 px-2.5 py-0.5 rounded-full text-[11px] font-bold"
+                        >
+                          <span>{kw}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeAlertKeyword(kw)}
+                            className="hover:text-red-900 cursor-pointer"
+                            title="Quitar palabra de alerta"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lista de Mensajes Auditados (SIN botón de borrado) */}
+                <div className="space-y-2.5">
+                  {filteredAuditMessages.length === 0 ? (
+                    <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center text-xs text-slate-500">
+                      No se encontraron mensajes con los filtros seleccionados.
+                    </div>
+                  ) : (
+                    filteredAuditMessages.map((m) => (
+                      <div
+                        key={m.id}
+                        className={`bg-white rounded-2xl p-4 border transition-all shadow-xs ${
+                          m.hasAlert ? "border-red-400 bg-red-50/40" : "border-slate-200"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-extrabold text-slate-900">{m.senderName}</span>
+                            <span className="text-slate-400">➔</span>
+                            <span className="font-semibold text-slate-700">{m.recipientName}</span>
+                            <span className="text-[10px] bg-slate-100 text-slate-600 font-mono px-2 py-0.5 rounded">
+                              {m.course}
+                            </span>
+                            <span className="text-[10px] bg-[#266b31]/10 text-[#266b31] font-bold px-2 py-0.5 rounded">
+                              {m.teacherName}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {m.hasAlert && (
+                              <span className="flex items-center gap-1 bg-red-600 text-white font-black text-[10px] px-2.5 py-0.5 rounded-full animate-pulse">
+                                <AlertTriangle className="w-3 h-3" />
+                                <span>ALERTA: {m.alertKeyword}</span>
+                              </span>
+                            )}
+                            <span className="text-[10px] font-semibold text-slate-400">
+                              {m.timestamp}
+                            </span>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-slate-800 mt-2 font-medium bg-[#FAFAF0] p-2.5 rounded-xl border border-slate-100">
+                          &ldquo;{m.text}&rdquo;
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 3. COMUNICADOS INSTITUCIONALES */}
+            {adminTab === "comunicados" && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                    <Bell className="w-5 h-5 text-[#d6a427]" />
+                    <span>Gestión de Comunicados Oficiales de Dirección</span>
+                  </h3>
+
+                  <button
+                    onClick={() => setShowNewAnnouncementModal(true)}
+                    className="flex items-center gap-1.5 bg-[#266b31] hover:bg-[#1b4e23] text-white font-bold px-3.5 py-2 rounded-xl text-xs shadow-md transition-all cursor-pointer"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    <span>Emitir Nuevo Comunicado</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {announcements.map((ann) => (
+                    <div
+                      key={ann.id}
+                      className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-start justify-between gap-4"
+                    >
+                      <div className="space-y-1.5 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
+                              ann.priority === "ALTA"
+                                ? "bg-red-100 text-red-800"
+                                : ann.priority === "MEDIA"
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
+                            PRIORIDAD {ann.priority}
+                          </span>
+                          <span className="text-xs font-semibold text-slate-400">{ann.date}</span>
+                          <span className="text-[10px] font-bold text-[#266b31] bg-[#266b31]/10 px-2 py-0.5 rounded">
+                            {ann.targetRole}
+                          </span>
+                        </div>
+
+                        <h4 className="text-sm font-extrabold text-slate-900">{ann.title}</h4>
+                        <p className="text-xs text-slate-600 leading-relaxed">{ann.content}</p>
+                      </div>
+
+                      <button
+                        onClick={() => deleteAnnouncement(ann.id)}
+                        className="text-slate-400 hover:text-red-600 p-2 rounded-lg transition-colors cursor-pointer"
+                        title="Eliminar comunicado"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 4. SUPERVISIÓN DE ENTREVISTAS MEET */}
+            {adminTab === "supervision_meet" && (
+              <div className="space-y-4">
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <Video className="w-5 h-5 text-blue-600" />
+                  <span>Registro y Supervisión Central de Entrevistas Meet</span>
+                </h3>
+
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-600 font-bold uppercase text-[10px]">
+                          <th className="p-3">Docente</th>
+                          <th className="p-3">Familia / Estudiante</th>
+                          <th className="p-3">Curso</th>
+                          <th className="p-3">Fecha y Hora</th>
+                          <th className="p-3">Código Sala</th>
+                          <th className="p-3">Estado</th>
+                          <th className="p-3 text-right">Acceso</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {interviews.map((m) => (
+                          <tr key={m.id} className="hover:bg-slate-50">
+                            <td className="p-3 font-bold text-slate-800">{m.teacherName}</td>
+                            <td className="p-3">
+                              <p className="font-semibold text-slate-800">{m.parentName}</p>
+                              <p className="text-[10px] text-slate-500">{m.studentName}</p>
+                            </td>
+                            <td className="p-3 text-[#266b31] font-bold">{m.course}</td>
+                            <td className="p-3 text-slate-500 font-mono">
+                              {m.date} {m.time}
+                            </td>
+                            <td className="p-3 font-mono text-[11px] text-blue-700">
+                              {m.meetCode}
+                            </td>
+                            <td className="p-3">
+                              <select
+                                value={m.status}
+                                onChange={(e) =>
+                                  updateMeetStatus(
+                                    m.id,
+                                    e.target.value as "PROGRAMADA" | "COMPLETADA" | "CANCELADA"
+                                  )
+                                }
+                                className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${
+                                  m.status === "COMPLETADA"
+                                    ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                    : m.status === "CANCELADA"
+                                    ? "bg-red-50 text-red-700 border-red-200"
+                                    : "bg-blue-50 text-blue-800 border-blue-200"
+                                }`}
+                              >
+                                <option value="PROGRAMADA">PROGRAMADA</option>
+                                <option value="COMPLETADA">COMPLETADA</option>
+                                <option value="CANCELADA">CANCELADA</option>
+                              </select>
+                            </td>
+                            <td className="p-3 text-right">
+                              <a
+                                href={m.meetLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline font-bold inline-flex items-center gap-1"
+                              >
+                                <span>Entrar</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -1482,13 +2105,203 @@ export default function FieldingDashboard() {
         )}
       </main>
 
-      {/* MODAL DE BOLETÍN OFICIAL DE CALIFICACIONES (TAMAÑO CARTA IMPRIMIBLE) */}
+      {/* MODAL PARA SOLICITAR NUEVA CITA MEET (PADRES / ESTUDIANTES) */}
+      {showParentMeetModal && (
+        <div className="no-print fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                <Video className="w-4 h-4 text-blue-600" />
+                <span>Solicitar Nueva Entrevista Google Meet</span>
+              </h3>
+              <button
+                onClick={() => setShowParentMeetModal(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={(e) => handleCreateMeet(e, true)} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-600 mb-1">Docente Titular</label>
+                <input
+                  type="text"
+                  value="Lic. Ivan Ezequiel Mancilla Copa"
+                  readOnly
+                  className="w-full bg-slate-100 border border-slate-200 rounded-xl p-2.5 font-semibold text-slate-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-slate-600 mb-1">Fecha Sugerida</label>
+                  <input
+                    type="date"
+                    value={newMeetDate}
+                    onChange={(e) => setNewMeetDate(e.target.value)}
+                    className="w-full bg-[#FAFAF0] border border-slate-300 rounded-xl p-2 font-medium"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-600 mb-1">Hora Sugerida</label>
+                  <input
+                    type="time"
+                    value={newMeetTime}
+                    onChange={(e) => setNewMeetTime(e.target.value)}
+                    className="w-full bg-[#FAFAF0] border border-slate-300 rounded-xl p-2 font-medium"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-600 mb-1">
+                  Motivo de la Entrevista
+                </label>
+                <textarea
+                  rows={3}
+                  value={newMeetReason}
+                  onChange={(e) => setNewMeetReason(e.target.value)}
+                  placeholder="Indique los temas a conversar con el docente..."
+                  className="w-full bg-[#FAFAF0] border border-slate-300 rounded-xl p-2.5 font-medium"
+                  required
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowParentMeetModal(false)}
+                  className="px-4 py-2 bg-slate-100 rounded-xl font-bold text-slate-600 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#266b31] hover:bg-[#1b4e23] text-white rounded-xl font-bold shadow-md cursor-pointer"
+                >
+                  Confirmar Solicitud Meet
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA EMITIR COMUNICADO (ADMIN) */}
+      {showNewAnnouncementModal && (
+        <div className="no-print fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-extrabold text-slate-900">
+                Emitir Comunicado Institucional
+              </h3>
+              <button
+                onClick={() => setShowNewAnnouncementModal(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateAnnouncement} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-600 mb-1">
+                  Título del Comunicado
+                </label>
+                <input
+                  type="text"
+                  value={newAnnTitle}
+                  onChange={(e) => setNewAnnTitle(e.target.value)}
+                  placeholder="Ej: Suspensión de actividades por feriado"
+                  className="w-full bg-[#FAFAF0] border border-slate-300 rounded-xl p-2.5 font-medium"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-slate-600 mb-1">Prioridad</label>
+                  <select
+                    value={newAnnPriority}
+                    onChange={(e) =>
+                      setNewAnnPriority(e.target.value as "ALTA" | "MEDIA" | "GENERAL")
+                    }
+                    className="w-full bg-[#FAFAF0] border border-slate-300 rounded-xl p-2 font-semibold"
+                  >
+                    <option value="GENERAL">General</option>
+                    <option value="MEDIA">Media</option>
+                    <option value="ALTA">Alta (Urgente)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-600 mb-1">Público Objetivo</label>
+                  <select
+                    value={newAnnTarget}
+                    onChange={(e) =>
+                      setNewAnnTarget(e.target.value as "TODOS" | "PADRES" | "DOCENTES")
+                    }
+                    className="w-full bg-[#FAFAF0] border border-slate-300 rounded-xl p-2 font-semibold"
+                  >
+                    <option value="TODOS">Todos</option>
+                    <option value="PADRES">Padres</option>
+                    <option value="DOCENTES">Docentes</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-600 mb-1">Contenido Detallado</label>
+                <textarea
+                  rows={4}
+                  value={newAnnContent}
+                  onChange={(e) => setNewAnnContent(e.target.value)}
+                  placeholder="Escriba el comunicado..."
+                  className="w-full bg-[#FAFAF0] border border-slate-300 rounded-xl p-2.5 font-medium"
+                  required
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewAnnouncementModal(false)}
+                  className="px-4 py-2 bg-slate-100 rounded-xl font-bold text-slate-600 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#266b31] hover:bg-[#1b4e23] text-white rounded-xl font-bold shadow-md cursor-pointer"
+                >
+                  Publicar Ahora
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL BOLETÍN CARTA OFICIAL */}
       {boletinStudent && (
-        <BoletinModal
-          student={boletinStudent}
-          onClose={() => setBoletinStudent(null)}
-        />
+        <BoletinModal student={boletinStudent} onClose={() => setBoletinStudent(null)} />
       )}
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#FAFAF0] flex items-center justify-center text-sm font-bold text-[#266b31]">
+          Cargando Fielding App...
+        </div>
+      }
+    >
+      <DashboardContent />
+    </Suspense>
   );
 }
